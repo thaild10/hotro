@@ -96,7 +96,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             type="submit"
             disabled={loading}
             className={cn(
-              "w-full bg-rose-400 py-4 rounded-2xl text-white font-black text-sm shadow-lg shadow-rose-200 active:scale-95 transition-transform",
+              "w-full bg-rose-400 py-4 rounded-2xl text-white font-black text-sm shadow-lg shadow-rose-200/50 active:scale-95 transition-transform",
               loading && "opacity-70 cursor-not-allowed"
             )}
           >
@@ -112,7 +112,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               exit={{ opacity: 0, height: 0 }}
               className="mt-4 w-full"
             >
-              <div className="flex items-center gap-2 bg-rose-50 text-rose-500 p-3 rounded-xl text-xs font-bold border border-rose-100">
+              <div className="flex items-center gap-2 bg-red-50 text-red-500 p-3 rounded-xl text-xs font-bold border border-red-100">
                 <CircleAlert className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>

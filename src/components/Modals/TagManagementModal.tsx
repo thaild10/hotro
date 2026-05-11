@@ -6,16 +6,14 @@ import { cn } from "../../lib/utils";
 
 // Helper for tag colors
 const TAG_COLOR_PALETTE = [
-  { bg: 'bg-rose-100',   text: 'text-rose-600',   border: 'border-rose-200'   },
-  { bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200' },
-  { bg: 'bg-amber-100',  text: 'text-amber-600',  border: 'border-amber-200'  },
-  { bg: 'bg-emerald-100',text: 'text-emerald-600',border: 'border-emerald-200'},
-  { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
-  { bg: 'bg-sky-100',    text: 'text-sky-600',    border: 'border-sky-200'    },
-  { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' },
-  { bg: 'bg-teal-100',   text: 'text-teal-600',   border: 'border-teal-200'   },
-  { bg: 'bg-pink-100',   text: 'text-pink-600',   border: 'border-pink-200'   },
-  { bg: 'bg-lime-100',   text: 'text-lime-600',   border: 'border-lime-200'   },
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
+  { bg: 'bg-violet-50', text: 'text-violet-500', border: 'border-violet-200' },
+  { bg: 'bg-amber-50',  text: 'text-amber-500',  border: 'border-amber-200'  },
+  { bg: 'bg-teal-50',   text: 'text-teal-500',   border: 'border-teal-200'   },
+  { bg: 'bg-fuchsia-50',text: 'text-fuchsia-500',border: 'border-fuchsia-200'},
+  { bg: 'bg-sky-50',    text: 'text-sky-500',    border: 'border-sky-200'    },
+  { bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-200' },
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
 ];
 
 function getTagColors(tagText: string) {
@@ -88,7 +86,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
         className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[80vh]"
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-lg text-indigo-600">Quản lý Tag</h3>
+          <h3 className="font-bold text-lg text-violet-500">Quản lý Tag</h3>
           <button onClick={onClose} className="p-2 bg-pastel-bg rounded-full"><X className="w-5 h-5" /></button>
         </div>
 
@@ -100,13 +98,13 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
             return (
               <div key={id} className="p-3 bg-pastel-bg rounded-2xl border border-pastel-border">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-black text-indigo-600">{name}</span>
+                  <span className="text-[11px] font-black text-violet-500">{name}</span>
                   <button 
                     onClick={() => {
                       setEditingTabId(tabId);
                       setSelectedTabsForNewTag([tabId]);
                     }} 
-                    className="text-[9px] font-black text-indigo-600 bg-white border border-indigo-200 px-2.5 py-1.5 rounded-lg active:scale-95"
+                    className="text-[9px] font-black text-violet-500 bg-white border border-violet-200 px-2.5 py-1.5 rounded-lg active:scale-95"
                   >
                     Sửa tag
                   </button>
@@ -131,7 +129,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
             setShowCreateTag(true);
             setSelectedTabsForNewTag([]);
           }} 
-          className="mt-4 w-full bg-indigo-500 py-3.5 rounded-2xl text-white font-black text-[14px] shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-95"
+          className="mt-4 w-full bg-violet-400 py-3.5 rounded-2xl text-white font-black text-[14px] shadow-lg shadow-violet-100 flex items-center justify-center gap-2 active:scale-95"
         >
           <Plus className="w-4 h-4" /> Tạo tag mới
         </button>
@@ -150,7 +148,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
             >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-bold text-lg text-indigo-600">Sửa tag khung</h3>
+                  <h3 className="font-bold text-lg text-violet-500">Sửa tag khung</h3>
                   <p className="text-[11px] font-black text-pastel-subtext mt-0.5">{TAB_NAMES[editingTabId]}</p>
                 </div>
                 <button onClick={() => setEditingTabId(null)} className="p-2 bg-pastel-bg rounded-full"><X className="w-5 h-5" /></button>
@@ -179,7 +177,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
               </div>
               <button 
                 onClick={() => setShowCreateTag(true)} 
-                className="mt-4 w-full bg-indigo-500 py-3.5 rounded-2xl text-white font-black text-[14px] shadow-lg flex items-center justify-center gap-2"
+                className="mt-4 w-full bg-violet-400 py-3.5 rounded-2xl text-white font-black text-[14px] shadow-lg flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" /> Tạo tag mới
               </button>
@@ -197,7 +195,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
               className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
             >
               <div className="flex items-center justify-between mb-5">
-                <h3 className="font-bold text-lg text-indigo-600">Tạo tag mới</h3>
+                <h3 className="font-bold text-lg text-violet-500">Tạo tag mới</h3>
                 <button onClick={() => setShowCreateTag(false)} className="p-2 bg-pastel-bg rounded-full"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-4">
@@ -207,7 +205,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
                     type="text" 
                     value={newTagName}
                     onChange={(e) => setNewTagName(e.target.value)}
-                    className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-[13px] font-bold outline-none focus:border-indigo-300 mt-1" 
+                    className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-[13px] font-bold outline-none focus:border-violet-300 mt-1" 
                     placeholder="Ví dụ: Đang làm, Chờ rep..."
                   />
                 </div>
@@ -223,7 +221,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
                           key={id}
                           className={cn(
                             "flex items-center gap-2 p-2 rounded-xl border cursor-pointer transition-all",
-                            isChecked ? "border-indigo-400 bg-indigo-50" : "border-pastel-border bg-pastel-bg"
+                            isChecked ? "border-violet-300 bg-violet-50" : "border-pastel-border bg-pastel-bg"
                           )}
                         >
                           <input 
@@ -233,7 +231,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
                               if (isChecked) setSelectedTabsForNewTag(prev => prev.filter(t => t !== tabId));
                               else setSelectedTabsForNewTag(prev => [...prev, tabId]);
                             }}
-                            className="w-3.5 h-3.5 accent-indigo-500"
+                            className="w-3.5 h-3.5 accent-violet-400"
                           />
                           <span className="text-[11px] font-bold text-pastel-text">{name}</span>
                         </label>
@@ -244,7 +242,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setShowCreateTag(false)} className="flex-1 py-3 font-bold text-pastel-subtext bg-pastel-bg rounded-xl">Hủy</button>
-                <button onClick={handleSaveNewTag} className="flex-1 py-3 font-black text-white bg-indigo-500 rounded-xl shadow-lg">Tạo tag</button>
+                <button onClick={handleSaveNewTag} className="flex-1 py-3 font-black text-white bg-violet-400 rounded-xl shadow-lg">Tạo tag</button>
               </div>
             </motion.div>
           </motion.div>

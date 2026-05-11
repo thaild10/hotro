@@ -18,6 +18,9 @@
 }
 
 @layer base {
+  html, body, #root {
+    @apply h-[100dvh] w-full overflow-hidden;
+  }
   body {
     @apply bg-pastel-bg text-pastel-text font-sans;
     -webkit-tap-highlight-color: transparent;

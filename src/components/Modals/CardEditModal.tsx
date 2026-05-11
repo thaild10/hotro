@@ -84,7 +84,7 @@ export default function CardEditModal({ card, onClose, onSave, onDelete }: CardE
             </button>
             <button 
               onClick={handleSave}
-              className="flex-1 py-3 font-black text-white bg-rose-400 rounded-xl shadow-lg active:scale-95 transition-all"
+              className="flex-1 py-3 font-black text-white bg-rose-400 rounded-xl shadow-lg shadow-rose-200/50 active:scale-95 transition-all"
             >
               Cập nhật
             </button>
@@ -93,7 +93,7 @@ export default function CardEditModal({ card, onClose, onSave, onDelete }: CardE
             onClick={() => {
               if (confirm("Xóa thẻ này?")) onDelete();
             }}
-            className="w-full py-3 font-bold text-rose-500 bg-rose-50 rounded-xl flex items-center justify-center gap-2 active:bg-rose-100 transition-all"
+            className="w-full py-3 font-bold text-red-500 bg-red-50 rounded-xl flex items-center justify-center gap-2 active:bg-red-100 transition-all border border-red-100"
           >
             <Trash2 className="w-4 h-4" /> Xóa thẻ
           </button>

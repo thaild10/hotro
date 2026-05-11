@@ -6,16 +6,14 @@ import { cn } from "../../lib/utils";
 
 // Helper for tag colors (duplicate for standalone usage or export if possible)
 const TAG_COLOR_PALETTE = [
-  { bg: 'bg-rose-100',   text: 'text-rose-600',   border: 'border-rose-200'   },
-  { bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200' },
-  { bg: 'bg-amber-100',  text: 'text-amber-600',  border: 'border-amber-200'  },
-  { bg: 'bg-emerald-100',text: 'text-emerald-600',border: 'border-emerald-200'},
-  { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
-  { bg: 'bg-sky-100',    text: 'text-sky-600',    border: 'border-sky-200'    },
-  { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' },
-  { bg: 'bg-teal-100',   text: 'text-teal-600',   border: 'border-teal-200'   },
-  { bg: 'bg-pink-100',   text: 'text-pink-600',   border: 'border-pink-200'   },
-  { bg: 'bg-lime-100',   text: 'text-lime-600',   border: 'border-lime-200'   },
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
+  { bg: 'bg-violet-50', text: 'text-violet-500', border: 'border-violet-200' },
+  { bg: 'bg-amber-50',  text: 'text-amber-500',  border: 'border-amber-200'  },
+  { bg: 'bg-teal-50',   text: 'text-teal-500',   border: 'border-teal-200'   },
+  { bg: 'bg-fuchsia-50',text: 'text-fuchsia-500',border: 'border-fuchsia-200'},
+  { bg: 'bg-sky-50',    text: 'text-sky-500',    border: 'border-sky-200'    },
+  { bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-200' },
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
 ];
 
 function getTagColors(tagText: string) {
@@ -50,7 +48,7 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateT
         className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
       >
         <div className="flex items-center gap-3 mb-5 border-b pb-3 border-pastel-border">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500">
+          <div className="w-10 h-10 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-500">
             <TagIcon className="w-5 h-5 fill-current" />
           </div>
           <div>
@@ -84,7 +82,7 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateT
 
         <button 
           onClick={onClose} 
-          className="w-full py-4 font-black text-white bg-rose-400 rounded-2xl shadow-lg active:scale-95 transition-all"
+          className="w-full py-4 font-black text-white bg-rose-400 rounded-2xl shadow-lg shadow-rose-200/50 active:scale-95 transition-all"
         >
           Hoàn tất
         </button>

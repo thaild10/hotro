@@ -15,16 +15,14 @@ import { KanbanCard, TAB_NAMES } from "../types";
 
 // Helper for tag colors (similar to logic in HTML)
 const TAG_COLOR_PALETTE = [
-  { bg: 'bg-rose-100',   text: 'text-rose-600',   border: 'border-rose-200'   },
-  { bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200' },
-  { bg: 'bg-amber-100',  text: 'text-amber-600',  border: 'border-amber-200'  },
-  { bg: 'bg-emerald-100',text: 'text-emerald-600',border: 'border-emerald-200'},
-  { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
-  { bg: 'bg-sky-100',    text: 'text-sky-600',    border: 'border-sky-200'    },
-  { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' },
-  { bg: 'bg-teal-100',   text: 'text-teal-600',   border: 'border-teal-200'   },
-  { bg: 'bg-pink-100',   text: 'text-pink-600',   border: 'border-pink-200'   },
-  { bg: 'bg-lime-100',   text: 'text-lime-600',   border: 'border-lime-200'   },
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
+  { bg: 'bg-violet-50', text: 'text-violet-500', border: 'border-violet-200' },
+  { bg: 'bg-amber-50',  text: 'text-amber-500',  border: 'border-amber-200'  },
+  { bg: 'bg-teal-50',   text: 'text-teal-500',   border: 'border-teal-200'   },
+  { bg: 'bg-fuchsia-50',text: 'text-fuchsia-500',border: 'border-fuchsia-200'},
+  { bg: 'bg-sky-50',    text: 'text-sky-500',    border: 'border-sky-200'    },
+  { bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-200' },
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
 ];
 
 function getTagColors(tagText: string) {
@@ -82,43 +80,43 @@ export default function Card({
       isDone && isCollapsed && "pb-4"
     )}>
       {/* Header */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center gap-2">
-          <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-500 text-[9px] font-black flex items-center justify-center shrink-0">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2.5">
+          <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-500 text-xs font-black flex items-center justify-center shrink-0">
             {index + 1}
           </span>
-          <div className="w-9 h-9 rounded-full bg-pastel-pink/10 flex items-center justify-center shrink-0 text-pastel-pink">
+          <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center shrink-0 text-rose-400">
             <UserIcon className="w-5 h-5 fill-current" />
           </div>
-          <span className="font-bold text-[15px] uppercase tracking-wide truncate max-w-[120px]">
+          <span className="font-bold text-base uppercase tracking-wide truncate max-w-[120px]">
             {card.name}
           </span>
         </div>
         
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {!isCollapsed && (
             <>
               <button 
                 onClick={onEdit} 
-                className="text-[10px] font-black text-pastel-subtext bg-pastel-bg px-2.5 py-1.5 rounded-full border border-pastel-border active:scale-95 transition-all"
+                className="text-xs font-black text-pastel-subtext bg-pastel-bg px-4 py-2.5 rounded-2xl border border-pastel-border active:scale-95 transition-all min-h-[40px]"
               >
                 Sửa thẻ
               </button>
               <button 
                 onClick={onDoctorReply} 
                 className={cn(
-                  "text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1 border border-indigo-100 active:scale-95 transition-all",
+                  "text-xs font-black text-violet-500 bg-violet-50 px-4 py-2.5 rounded-2xl flex items-center gap-1.5 border border-violet-100 active:scale-95 transition-all min-h-[40px]",
                   card.doctorText && !card.doctorHidden && "opacity-40"
                 )}
               >
-                <Stethoscope className="w-3 h-3 fill-current" /> Bác sĩ phản hồi
+                <Stethoscope className="w-4 h-4 fill-current" /> Bác sĩ phản hồi
               </button>
             </>
           )}
           {isDone && (
             <button 
               onClick={handleToggleCollapse}
-              className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-full border border-emerald-200 active:scale-95 transition-all"
+              className="text-xs font-black text-teal-600 bg-teal-50 px-4 py-2.5 rounded-2xl border border-teal-200 active:scale-95 transition-all min-h-[40px]"
             >
               {isCollapsed ? "Mở" : "Đóng"}
             </button>
@@ -128,22 +126,22 @@ export default function Card({
 
       {/* Done Summary (when collapsed in Step 6) */}
       {isDone && isCollapsed && (
-        <div className="flex items-center gap-2 text-[10.5px] font-black flex-wrap mt-1">
-          <span className="flex items-center gap-0.5 text-pastel-subtext">
-            <PlayCircle className="w-3 h-3" /> Bắt đầu <b>{card.startDate}</b>
+        <div className="flex items-center gap-2 text-xs font-black flex-wrap mt-1">
+          <span className="flex items-center gap-1 text-pastel-subtext">
+            <PlayCircle className="w-3.5 h-3.5" /> Bắt đầu <b>{card.startDate}</b>
           </span>
           {card.doDate && (
             <>
               <span className="text-pastel-subtext">·</span>
-              <span className="flex items-center gap-0.5 text-rose-400">
-                <SearchIcon className="w-3 h-3" /> Ngày dò <b>{card.doDate}</b>
+              <span className="flex items-center gap-1 text-rose-400">
+                <SearchIcon className="w-3.5 h-3.5" /> Ngày dò <b>{card.doDate}</b>
               </span>
             </>
           )}
           {card.doneDate && (
             <>
               <span className="text-pastel-subtext">·</span>
-              <span className="flex items-center gap-0.5 text-emerald-600">
+              <span className="flex items-center gap-0.5 text-teal-500">
                 <CheckCircle className="w-3 h-3" /> Xong <b>{card.doneDate}</b>
               </span>
             </>
@@ -152,43 +150,43 @@ export default function Card({
       )}
 
       {/* Body Content */}
-      <div className={cn("space-y-3", isCollapsed && "hidden")}>
+      <div className={cn("space-y-4", isCollapsed && "hidden")}>
         <div className="px-1 relative">
-          <p className="line-clamp-2 customer-text-content font-medium text-[13.5px] whitespace-pre-line text-pastel-text/90">
+          <p className="line-clamp-2 customer-text-content font-medium text-sm whitespace-pre-line text-pastel-text/90">
             {card.note}
           </p>
           <button 
             onClick={onNoteEdit} 
-            className="text-[11px] font-bold text-rose-500 mt-1.5 flex items-center gap-1 active:opacity-70"
+            className="text-xs font-bold text-rose-500 mt-2 flex items-center gap-1.5 active:opacity-70 py-2"
           >
-            <Notebook className="w-3 h-3" /> Sửa ghi chú
+            <Notebook className="w-4 h-4" /> Sửa ghi chú
           </button>
         </div>
 
         {card.doctorText && !card.doctorHidden && (
-          <div className="bg-indigo-50/30 border-l-4 border-indigo-400 p-3 rounded-r-2xl mt-2 relative">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[11px] font-black text-indigo-600">{card.doctorDate}</span>
-              <span className="text-[11px] font-black text-indigo-600">Bác sĩ phản hồi:</span>
+          <div className="bg-violet-50/50 border-l-4 border-violet-300 p-4 rounded-r-2xl mt-2 relative">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-black text-violet-500">{card.doctorDate}</span>
+              <span className="text-xs font-black text-violet-500">Bác sĩ phản hồi:</span>
             </div>
-            <p className="text-[12.5px] line-clamp-2 mb-2 whitespace-pre-line text-pastel-text/90 font-medium italic">
+            <p className="text-sm line-clamp-2 mb-3 whitespace-pre-line text-pastel-text/90 font-medium italic">
               {card.doctorText}
             </p>
             <div className="flex items-center gap-2">
               <button 
                 onClick={onDoctorReply} 
-                className="px-2 py-1 rounded-lg bg-white border border-indigo-200 text-indigo-600 font-bold text-[10px]"
+                className="px-3 py-2 rounded-xl bg-white border border-violet-200 text-violet-500 font-bold text-xs active:scale-95 min-h-[36px]"
               >
                 Sửa
               </button>
               {card.notified ? (
-                <span className="bg-green-50 text-emerald-600 border border-green-200 px-2 py-1 rounded-lg font-bold text-[10px]">
+                <span className="bg-teal-50 text-teal-600 border border-teal-200 px-3 py-2 rounded-xl font-bold text-xs min-h-[36px] flex items-center">
                   {card.notifiedTime}
                 </span>
               ) : (
                 <button 
                   onClick={handleNotify}
-                  className="px-2 py-1 rounded-lg bg-rose-500 text-white font-black text-[10px] active:scale-95"
+                  className="px-3 py-2 rounded-xl bg-rose-400 text-white font-black text-xs active:scale-95 min-h-[36px]"
                 >
                   Báo khách
                 </button>
@@ -200,34 +198,34 @@ export default function Card({
 
       {/* Footer */}
       {!isCollapsed && (
-        <div className="mt-4 pt-4 border-t border-pastel-border/60 overflow-x-auto no-scrollbar">
-          <div className="flex items-center justify-between gap-3 min-w-max pb-1">
-            <div className="flex items-center gap-3 whitespace-nowrap shrink-0">
-              <div className="flex items-center gap-3 text-[12.5px] font-black">
-                <div className="flex items-center gap-1 text-pastel-subtext">
-                  <PlayCircle className="w-3.5 h-3.5" />
+        <div className="mt-5 pt-4 border-t border-pastel-border/60 overflow-x-auto no-scrollbar pb-2">
+          <div className="flex items-center justify-between gap-4 min-w-max">
+            <div className="flex items-center gap-4 whitespace-nowrap shrink-0">
+              <div className="flex items-center gap-3 text-xs font-black">
+                <div className="flex items-center gap-1.5 text-pastel-subtext">
+                  <PlayCircle className="w-4 h-4" />
                   <span className="ml-0.5">Bắt đầu</span> <span>{card.startDate}</span>
                 </div>
-                <div className="flex items-center gap-1 text-rose-500">
-                  <SearchIcon className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-1.5 text-rose-500">
+                  <SearchIcon className="w-4 h-4" />
                   <span className="ml-0.5">Ngày dò</span> <span>{card.doDate}</span>
                 </div>
                 {card.tabId === 6 && card.doneDate && (
-                  <div className="flex items-center gap-1 text-emerald-600">
-                    <CheckCircle className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-1.5 text-teal-600">
+                    <CheckCircle className="w-4 h-4" />
                     <span className="ml-0.5">Xong</span> <span>{card.doneDate}</span>
                   </div>
                 )}
               </div>
 
-              <div className="flex gap-1.5 items-center">
+              <div className="flex gap-2 items-center">
                 {card.tags.map(tag => {
                   const colors = getTagColors(tag);
                   return (
                     <span 
                       key={tag} 
                       className={cn(
-                        "px-2 py-0.5 rounded-full text-[9px] font-black border",
+                        "px-2.5 py-1 rounded-full text-[10px] uppercase font-black border",
                         colors.bg, colors.text, colors.border
                       )}
                     >
@@ -239,24 +237,24 @@ export default function Card({
 
               <button 
                 onClick={onTagEdit}
-                className="w-7 h-7 rounded-full bg-pastel-bg text-pastel-subtext flex items-center justify-center border border-pastel-border shrink-0 active:scale-90 transition-all"
+                className="w-10 h-10 rounded-full bg-pastel-bg text-pastel-subtext flex items-center justify-center border border-pastel-border shrink-0 active:scale-90 transition-all"
               >
-                <Pencil className="w-3.5 h-3.5" />
+                <Pencil className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {card.tabId === 1 && (
                 <>
                   <button 
                     onClick={() => onMove(2)}
-                    className="px-3 py-1.5 rounded-xl bg-cyan-50 text-cyan-600 font-bold text-[10px] border border-cyan-100 active:scale-95"
+                    className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sky-500 font-bold text-xs border border-sky-100 active:scale-95 min-h-[40px]"
                   >
                     2. Gửi hàng
                   </button>
                   <button 
                     onClick={() => onMove(3)}
-                    className="px-2.5 py-1.5 rounded-xl bg-pastel-green/10 text-emerald-600 font-bold text-[10px] border border-pastel-green/20 active:scale-95"
+                    className="px-4 py-2.5 rounded-2xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 min-h-[40px]"
                   >
                     3. Add/Dò
                   </button>
@@ -265,16 +263,16 @@ export default function Card({
               {card.tabId !== 6 && (
                 <button 
                   onClick={() => onMove(6)}
-                  className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-500 font-bold text-[10px] border border-rose-100 active:scale-95"
+                  className="px-4 py-2.5 rounded-2xl bg-rose-50 text-rose-500 font-bold text-xs border border-rose-100 active:scale-95 min-h-[40px]"
                 >
                   6. Xong
                 </button>
               )}
               <button 
                 onClick={onHistory}
-                className="text-[10px] font-bold text-pastel-subtext flex items-center gap-1 bg-pastel-bg px-2.5 py-1.5 rounded-xl border border-pastel-border/50 active:scale-95"
+                className="text-xs font-bold text-pastel-subtext flex items-center gap-1.5 bg-pastel-bg px-4 py-2.5 rounded-2xl border border-pastel-border/50 active:scale-95 min-h-[40px]"
               >
-                <History className="w-3 h-3" /> Lịch sử
+                <History className="w-4 h-4" /> Lịch sử
               </button>
             </div>
           </div>
