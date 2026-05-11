@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper to extract username from email
+    function getUsernameFromEmail() {
+      return request.auth.token.email.replace('@app.local', '');
+    }
+
+    match /appdata/{username} {
+      function isOwner(username) {
+        return isSignedIn() && (
+          username == getUsernameFromEmail() || 
+          username == request.auth.uid // Fallback for various auth types
+        );
+      }
+
+      function isValidAppData(data) {
+        return data.keys().hasAll(['cards', 'tagsConfig']) &&
+               data.cards is list &&
+               data.tagsConfig is map &&
+               // Limit array sizes to avoid DoW (Denial of Wallet)
+               data.cards.size() <= 1000 &&
+               data.keys().size() == 2;
+      }
+
+      allow get: if isOwner(username);
+      allow create: if isOwner(username) && isValidAppData(request.resource.data);
+      allow update: if isOwner(username) && isValidAppData(request.resource.data);
+      allow delete: if false; // Data is precious
+    }
+  }
+}

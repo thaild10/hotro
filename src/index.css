@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Quicksand", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-pastel-bg: #fcf7f8;
+  --color-pastel-col: #ffffff;
+  --color-pastel-text: #5c4b51;
+  --color-pastel-subtext: #8c7a80;
+  --color-pastel-border: #f2e8ea;
+  --color-pastel-pink: #f4adc6;
+  --color-pastel-blue: #aee1f9;
+  --color-pastel-green: #b8e8c8;
+  --color-pastel-yellow: #fce3a2;
+  --color-pastel-purple: #d6c8f9;
+  --color-pastel-red: #fcaeb2;
+}
+
+@layer base {
+  body {
+    @apply bg-pastel-bg text-pastel-text font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

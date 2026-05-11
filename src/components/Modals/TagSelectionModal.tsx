@@ -1,0 +1,94 @@
+import React from "react";
+import { X, Tag as TagIcon } from "lucide-react";
+import { KanbanCard, Tag } from "../../types";
+import { motion } from "motion/react";
+import { cn } from "../../lib/utils";
+
+// Helper for tag colors (duplicate for standalone usage or export if possible)
+const TAG_COLOR_PALETTE = [
+  { bg: 'bg-rose-100',   text: 'text-rose-600',   border: 'border-rose-200'   },
+  { bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200' },
+  { bg: 'bg-amber-100',  text: 'text-amber-600',  border: 'border-amber-200'  },
+  { bg: 'bg-emerald-100',text: 'text-emerald-600',border: 'border-emerald-200'},
+  { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
+  { bg: 'bg-sky-100',    text: 'text-sky-600',    border: 'border-sky-200'    },
+  { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' },
+  { bg: 'bg-teal-100',   text: 'text-teal-600',   border: 'border-teal-200'   },
+  { bg: 'bg-pink-100',   text: 'text-pink-600',   border: 'border-pink-200'   },
+  { bg: 'bg-lime-100',   text: 'text-lime-600',   border: 'border-lime-200'   },
+];
+
+function getTagColors(tagText: string) {
+  let hash = 0;
+  for (let i = 0; i < tagText.length; i++) hash = (hash * 31 + tagText.charCodeAt(i)) % TAG_COLOR_PALETTE.length;
+  return TAG_COLOR_PALETTE[hash];
+}
+
+interface TagSelectionModalProps {
+  card: KanbanCard;
+  tagsConfig: Record<number, Tag[]>;
+  onClose: () => void;
+  onUpdateTags: (tags: string[]) => void;
+}
+
+export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateTags }: TagSelectionModalProps) {
+  const availTags = tagsConfig[card.tabId] || [];
+  
+  const toggleTag = (tagText: string) => {
+    if (card.tags.includes(tagText)) {
+      onUpdateTags(card.tags.filter(t => t !== tagText));
+    } else {
+      onUpdateTags([...card.tags, tagText]);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px]">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
+      >
+        <div className="flex items-center gap-3 mb-5 border-b pb-3 border-pastel-border">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500">
+            <TagIcon className="w-5 h-5 fill-current" />
+          </div>
+          <div>
+            <h3 className="font-bold text-pastel-text text-lg">Gán Tag</h3>
+            <p className="text-[11px] font-bold text-pastel-subtext uppercase">{card.name}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mb-6">
+          {availTags.length > 0 ? availTags.map(tag => {
+            const colors = getTagColors(tag.text);
+            const isActive = card.tags.includes(tag.text);
+            return (
+              <button 
+                key={tag.text}
+                onClick={() => toggleTag(tag.text)}
+                className={cn(
+                  "py-2.5 px-3 rounded-2xl text-[11px] font-black border transition-all active:scale-95",
+                  isActive ? cn(colors.bg, colors.text, colors.border, "border-2") : "bg-pastel-bg text-pastel-subtext border-pastel-border"
+                )}
+              >
+                {tag.text}
+              </button>
+            );
+          }) : (
+            <p className="col-span-2 text-center text-[11px] italic text-pastel-subtext py-6">
+              Không có tag cho bước này
+            </p>
+          )}
+        </div>
+
+        <button 
+          onClick={onClose} 
+          className="w-full py-4 font-black text-white bg-rose-400 rounded-2xl shadow-lg active:scale-95 transition-all"
+        >
+          Hoàn tất
+        </button>
+      </motion.div>
+    </div>
+  );
+}

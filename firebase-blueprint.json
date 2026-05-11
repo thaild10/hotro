@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "AppData": {
+      "title": "AppData",
+      "description": "User specific application data including kanban cards and tag configurations.",
+      "type": "object",
+      "properties": {
+        "cards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/KanbanCard"
+          }
+        },
+        "tagsConfig": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/entities/Tag"
+            }
+          }
+        }
+      },
+      "required": ["cards", "tagsConfig"]
+    },
+    "KanbanCard": {
+      "title": "KanbanCard",
+      "description": "A single card in the kanban system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tabId": { "type": "number" },
+        "name": { "type": "string" },
+        "note": { "type": "string" },
+        "doDate": { "type": "string" },
+        "startDate": { "type": "string" },
+        "doneDate": { "type": "string" },
+        "collapsed": { "type": "boolean" },
+        "doctorText": { "type": "string" },
+        "doctorDate": { "type": "string" },
+        "doctorHidden": { "type": "boolean" },
+        "notified": { "type": "boolean" },
+        "notifiedTime": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "logs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "Tag": {
+      "title": "Tag",
+      "description": "Tag configuration for a column.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "color": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "appdata/{username}": {
+      "schema": "AppData",
+      "description": "Collection storing user specific kanban data indexed by username."
+    }
+  }
+}

@@ -1,0 +1,255 @@
+import React, { useState } from "react";
+import { X, Plus, Search } from "lucide-react";
+import { Tag, TAB_NAMES } from "../../types";
+import { motion, AnimatePresence } from "motion/react";
+import { cn } from "../../lib/utils";
+
+// Helper for tag colors
+const TAG_COLOR_PALETTE = [
+  { bg: 'bg-rose-100',   text: 'text-rose-600',   border: 'border-rose-200'   },
+  { bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200' },
+  { bg: 'bg-amber-100',  text: 'text-amber-600',  border: 'border-amber-200'  },
+  { bg: 'bg-emerald-100',text: 'text-emerald-600',border: 'border-emerald-200'},
+  { bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' },
+  { bg: 'bg-sky-100',    text: 'text-sky-600',    border: 'border-sky-200'    },
+  { bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' },
+  { bg: 'bg-teal-100',   text: 'text-teal-600',   border: 'border-teal-200'   },
+  { bg: 'bg-pink-100',   text: 'text-pink-600',   border: 'border-pink-200'   },
+  { bg: 'bg-lime-100',   text: 'text-lime-600',   border: 'border-lime-200'   },
+];
+
+function getTagColors(tagText: string) {
+  let hash = 0;
+  for (let i = 0; i < tagText.length; i++) {
+    hash = (hash * 31 + tagText.charCodeAt(i)) % TAG_COLOR_PALETTE.length;
+  }
+  return TAG_COLOR_PALETTE[hash];
+}
+
+interface TagManagementModalProps {
+  tagsConfig: Record<number, Tag[]>;
+  onClose: () => void;
+  onUpdateConfig: (newConfig: Record<number, Tag[]>) => void;
+}
+
+export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig }: TagManagementModalProps) {
+  const [editingTabId, setEditingTabId] = useState<number | null>(null);
+  const [showCreateTag, setShowCreateTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [selectedTabsForNewTag, setSelectedTabsForNewTag] = useState<number[]>([]);
+
+  const handleToggleTagInTab = (tabId: number, tagText: string) => {
+    const currentTags = tagsConfig[tabId] || [];
+    const exists = currentTags.find(t => t.text === tagText);
+    
+    let newTags;
+    if (exists) {
+      newTags = currentTags.filter(t => t.text !== tagText);
+    } else {
+      newTags = [...currentTags, { text: tagText }];
+    }
+    
+    onUpdateConfig({ ...tagsConfig, [tabId]: newTags });
+  };
+
+  const handleDeleteTagGlobal = (tagText: string) => {
+    if (!confirm(`Xoá tag "${tagText}" khỏi toàn bộ hệ thống?`)) return;
+    
+    const newConfig: Record<number, Tag[]> = {};
+    Object.entries(tagsConfig).forEach(([id, tags]) => {
+      newConfig[parseInt(id)] = tags.filter(t => t.text !== tagText);
+    });
+    onUpdateConfig(newConfig);
+  };
+
+  const handleSaveNewTag = () => {
+    if (!newTagName.trim() || selectedTabsForNewTag.length === 0) return;
+    
+    const newConfig = { ...tagsConfig };
+    selectedTabsForNewTag.forEach(tabId => {
+      if (!newConfig[tabId]) newConfig[tabId] = [];
+      if (!newConfig[tabId].find(t => t.text === newTagName)) {
+        newConfig[tabId].push({ text: newTagName });
+      }
+    });
+    
+    onUpdateConfig(newConfig);
+    setShowCreateTag(false);
+    setNewTagName("");
+  };
+
+  const allAvailableTags = Array.from(new Set(Object.values(tagsConfig).flatMap(tags => tags.map(t => t.text))));
+
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[80vh]"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-lg text-indigo-600">Quản lý Tag</h3>
+          <button onClick={onClose} className="p-2 bg-pastel-bg rounded-full"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 no-scrollbar">
+          {Object.entries(TAB_NAMES).map(([id, name]) => {
+            const tabId = parseInt(id);
+            if (tabId === 0) return null;
+            const tags = tagsConfig[tabId] || [];
+            return (
+              <div key={id} className="p-3 bg-pastel-bg rounded-2xl border border-pastel-border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-black text-indigo-600">{name}</span>
+                  <button 
+                    onClick={() => {
+                      setEditingTabId(tabId);
+                      setSelectedTabsForNewTag([tabId]);
+                    }} 
+                    className="text-[9px] font-black text-indigo-600 bg-white border border-indigo-200 px-2.5 py-1.5 rounded-lg active:scale-95"
+                  >
+                    Sửa tag
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.length > 0 ? tags.map(t => {
+                    const colors = getTagColors(t.text);
+                    return (
+                      <span key={t.text} className={cn("px-2 py-0.5 rounded-full text-[9px] font-black border", colors.bg, colors.text, colors.border)}>
+                        {t.text}
+                      </span>
+                    );
+                  }) : <span className="text-[9px] italic text-pastel-subtext">Chưa có tag</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button 
+          onClick={() => {
+            setShowCreateTag(true);
+            setSelectedTabsForNewTag([]);
+          }} 
+          className="mt-4 w-full bg-indigo-500 py-3.5 rounded-2xl text-white font-black text-[14px] shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 active:scale-95"
+        >
+          <Plus className="w-4 h-4" /> Tạo tag mới
+        </button>
+      </motion.div>
+
+      {/* Sub Modals */}
+      <AnimatePresence>
+        {editingTabId !== null && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1200] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[80vh]"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-lg text-indigo-600">Sửa tag khung</h3>
+                  <p className="text-[11px] font-black text-pastel-subtext mt-0.5">{TAB_NAMES[editingTabId]}</p>
+                </div>
+                <button onClick={() => setEditingTabId(null)} className="p-2 bg-pastel-bg rounded-full"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto no-scrollbar">
+                <div className="flex flex-wrap gap-2 py-2">
+                  {allAvailableTags.map(tagText => {
+                    const isActive = (tagsConfig[editingTabId!] || []).some(t => t.text === tagText);
+                    const colors = getTagColors(tagText);
+                    return (
+                      <button 
+                        key={tagText}
+                        onClick={() => handleToggleTagInTab(editingTabId!, tagText)}
+                        onContextMenu={(e) => { e.preventDefault(); handleDeleteTagGlobal(tagText); }}
+                        className={cn(
+                          "px-3 py-1.5 rounded-full text-[10px] font-black transition-all border",
+                          isActive ? cn(colors.bg, colors.text, colors.border, "border-2") : "bg-white text-pastel-subtext border-pastel-border opacity-50"
+                        )}
+                      >
+                        {tagText}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-pastel-subtext italic mt-2">Bấm để bật/tắt · Giữ chuột phải (Mobile: ấn giữ) để xoá vĩnh viễn</p>
+              </div>
+              <button 
+                onClick={() => setShowCreateTag(true)} 
+                className="mt-4 w-full bg-indigo-500 py-3.5 rounded-2xl text-white font-black text-[14px] shadow-lg flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Tạo tag mới
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {showCreateTag && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1300] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-bold text-lg text-indigo-600">Tạo tag mới</h3>
+                <button onClick={() => setShowCreateTag(false)} className="p-2 bg-pastel-bg rounded-full"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[11px] font-black text-pastel-subtext uppercase ml-1">Tên tag</label>
+                  <input 
+                    type="text" 
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-[13px] font-bold outline-none focus:border-indigo-300 mt-1" 
+                    placeholder="Ví dụ: Đang làm, Chờ rep..."
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-pastel-subtext uppercase ml-1">Áp dụng cho khung</label>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {Object.entries(TAB_NAMES).map(([id, name]) => {
+                      const tabId = parseInt(id);
+                      if (tabId === 0) return null;
+                      const isChecked = selectedTabsForNewTag.includes(tabId);
+                      return (
+                        <label 
+                          key={id}
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-xl border cursor-pointer transition-all",
+                            isChecked ? "border-indigo-400 bg-indigo-50" : "border-pastel-border bg-pastel-bg"
+                          )}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) setSelectedTabsForNewTag(prev => prev.filter(t => t !== tabId));
+                              else setSelectedTabsForNewTag(prev => [...prev, tabId]);
+                            }}
+                            className="w-3.5 h-3.5 accent-indigo-500"
+                          />
+                          <span className="text-[11px] font-bold text-pastel-text">{name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setShowCreateTag(false)} className="flex-1 py-3 font-bold text-pastel-subtext bg-pastel-bg rounded-xl">Hủy</button>
+                <button onClick={handleSaveNewTag} className="flex-1 py-3 font-black text-white bg-indigo-500 rounded-xl shadow-lg">Tạo tag</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
