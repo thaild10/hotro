@@ -1,27 +1,45 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { X, NotebookPen, Trash2 } from "lucide-react";
-import { KanbanCard } from "../../types";
-import { motion } from "motion/react";
+import { KanbanCard, Customer } from "../../types";
+import { motion, AnimatePresence } from "motion/react";
+import { cn } from "../../lib/utils";
 
 interface CardEditModalProps {
   card: KanbanCard;
+  customers?: Customer[];
   onClose: () => void;
   onSave: (updates: Partial<KanbanCard>) => void;
   onDelete: () => void;
 }
 
-export default function CardEditModal({ card, onClose, onSave, onDelete }: CardEditModalProps) {
+export default function CardEditModal({ card, customers = [], onClose, onSave, onDelete }: CardEditModalProps) {
   const [name, setName] = useState(card.name === "MỚI" ? "" : card.name);
   const [doDate, setDoDate] = useState(card.doDate);
   const [note, setNote] = useState(card.note);
   const [error, setError] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const suggestions = useMemo(() => {
+    if (name.length < 3) return [];
+    return customers.filter(c => 
+      c.name.toLowerCase().includes(name.toLowerCase())
+    ).slice(0, 5);
+  }, [name, customers]);
 
   const handleSave = () => {
+    if (!name.trim()) {
+      setError("Vui lòng nhập tên khách hàng");
+      return;
+    }
+    if (!doDate.trim()) {
+      setError("Vui lòng nhập ngày dò");
+      return;
+    }
     if (doDate && !/^(\d{1,2})\.(\d{1,2})$/.test(doDate)) {
       setError("Ngày dò sai định dạng. Ví dụ: 20.10");
       return;
     }
-    onSave({ name, doDate, note });
+    onSave({ name: name.trim(), doDate, note });
   };
 
   return (
@@ -29,7 +47,7 @@ export default function CardEditModal({ card, onClose, onSave, onDelete }: CardE
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
+        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl relative"
       >
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-500">
@@ -39,18 +57,56 @@ export default function CardEditModal({ card, onClose, onSave, onDelete }: CardE
         </div>
 
         <div className="space-y-4 mb-6">
-          <div>
-            <label className="text-[11px] font-bold text-pastel-subtext uppercase ml-1">Tên khách hàng</label>
+          <div className="relative">
+            <label className="text-[11px] font-bold text-pastel-subtext uppercase ml-1">
+              Tên khách hàng <span className="text-red-500">*</span>
+            </label>
             <input 
               type="text" 
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setShowSuggestions(true);
+                setError(null);
+              }}
+              onFocus={() => setShowSuggestions(true)}
               className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-[14px] font-bold uppercase outline-none focus:border-rose-200"
               placeholder="Họ tên khách"
             />
+            {/* Suggestions */}
+            <AnimatePresence>
+              {showSuggestions && suggestions.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-pastel-border rounded-xl shadow-xl overflow-hidden"
+                >
+                  {suggestions.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setName(s.name);
+                        setShowSuggestions(false);
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-bold hover:bg-pastel-bg transition-colors flex items-center gap-3 border-b border-pastel-border last:border-0"
+                    >
+                      {s.imageUrl ? (
+                        <img src={s.imageUrl} alt={s.name} className="w-6 h-6 rounded-md object-cover" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-md bg-pastel-bg flex items-center justify-center"><NotebookPen className="w-3 h-3 text-pastel-subtext" /></div>
+                      )}
+                      <span className="uppercase">{s.name}</span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <div>
-            <label className="text-[11px] font-bold text-pastel-subtext uppercase ml-1">Ngày dò</label>
+            <label className="text-[11px] font-bold text-pastel-subtext uppercase ml-1">
+              Ngày dò <span className="text-red-500">*</span>
+            </label>
             <input 
               type="text" 
               value={doDate}
@@ -61,7 +117,6 @@ export default function CardEditModal({ card, onClose, onSave, onDelete }: CardE
               className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-[14px] font-medium outline-none focus:border-rose-200"
               placeholder="Ví dụ: 20.10"
             />
-            {error && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{error}</p>}
           </div>
           <div>
             <label className="text-[11px] font-bold text-pastel-subtext uppercase ml-1">Ghi chú khách</label>
@@ -72,6 +127,7 @@ export default function CardEditModal({ card, onClose, onSave, onDelete }: CardE
               placeholder="Nhập nội dung"
             />
           </div>
+          {error && <p className="text-[11px] text-red-500 font-bold mt-1 ml-1">{error}</p>}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -86,17 +142,17 @@ export default function CardEditModal({ card, onClose, onSave, onDelete }: CardE
               onClick={handleSave}
               className="flex-1 py-3 font-black text-white bg-rose-400 rounded-xl shadow-lg shadow-rose-200/50 active:scale-95 transition-all"
             >
-              Cập nhật
+              {card.id === 'temp' ? "Tạo thẻ" : "Cập nhật"}
             </button>
           </div>
-          <button 
-            onClick={() => {
-              if (confirm("Xóa thẻ này?")) onDelete();
-            }}
-            className="w-full py-3 font-bold text-red-500 bg-red-50 rounded-xl flex items-center justify-center gap-2 active:bg-red-100 transition-all border border-red-100"
-          >
-            <Trash2 className="w-4 h-4" /> Xóa thẻ
-          </button>
+          {card.id !== 'temp' && (
+            <button 
+              onClick={onDelete}
+              className="w-full py-3 font-bold text-red-500 bg-red-50 rounded-xl flex items-center justify-center gap-2 active:bg-red-100 transition-all border border-red-100"
+            >
+              <Trash2 className="w-4 h-4" /> Xóa thẻ
+            </button>
+          )}
         </div>
       </motion.div>
     </div>

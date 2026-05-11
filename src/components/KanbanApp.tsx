@@ -9,7 +9,10 @@ import {
   Tag as TagIcon, 
   Settings2,
   Clock,
-  X
+  X,
+  Users,
+  Shield,
+  Package
 } from "lucide-react";
 import { 
   cn, 
@@ -22,17 +25,26 @@ import {
   KanbanCard, 
   TAB_NAMES, 
   Tag,
-  DEFAULT_TAGS 
+  DEFAULT_TAGS,
+  Customer,
+  UserAccount,
+  Brand,
+  ProductCategory,
+  Product
 } from "../types";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import Card from "./Card";
 import CardEditModal from "./Modals/CardEditModal";
 import TagManagementModal from "./Modals/TagManagementModal";
+import CustomerManagementModal from "./Modals/CustomerManagementModal";
+import AccountManagementModal from "./Modals/AccountManagementModal";
+import ProductManagementModal from "./Modals/ProductManagementModal";
 import CardHistoryModal from "./Modals/CardHistoryModal";
 import TagSelectionModal from "./Modals/TagSelectionModal";
 import NoteEditModal from "./Modals/NoteEditModal";
 import DoctorReplyModal from "./Modals/DoctorReplyModal";
+import { ConfirmDialog } from "./Modals/ConfirmDialog";
 
 interface KanbanAppProps {
   username: string;
@@ -43,29 +55,59 @@ interface KanbanAppProps {
 export default function KanbanApp({ username, initialData, onLogout }: KanbanAppProps) {
   const [cards, setCards] = useState<KanbanCard[]>(initialData.cards || []);
   const [tagsConfig, setTagsConfig] = useState<Record<number, Tag[]>>(initialData.tagsConfig || DEFAULT_TAGS);
+  const [customers, setCustomers] = useState<Customer[]>(initialData.customers || []);
+  const [users, setUsers] = useState<UserAccount[]>(initialData.users || []);
   const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "offline">("saved");
-  
+
+  // Determine user role
+  const currentUserRole = users.find(u => u.username === username)?.role || "Admin"; // Defaults to Admin if unconfigured
+
   // Modal states
+  const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [tagModalCardId, setTagModalCardId] = useState<string | null>(null);
   const [historyCardId, setHistoryCardId] = useState<string | null>(null);
   const [noteEditCardId, setNoteEditCardId] = useState<string | null>(null);
   const [doctorReplyCardId, setDoctorReplyCardId] = useState<string | null>(null);
   const [showTagManagement, setShowTagManagement] = useState(false);
+  const [showCustomerManagement, setShowCustomerManagement] = useState(false);
+  const [showAccountManagement, setShowAccountManagement] = useState(false);
 
   const prevCardsRef = useRef(cards);
   const prevTagsRef = useRef(tagsConfig);
+  const prevCustomersRef = useRef(customers);
+  const prevUsersRef = useRef(users);
+
+  const [brands, setBrands] = useState<Brand[]>(initialData.brands || []);
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>(initialData.productCategories || []);
+  const [products, setProducts] = useState<Product[]>(initialData.products || []);
+  const [showProductManagement, setShowProductManagement] = useState(false);
+
+  const prevBrandsRef = useRef(brands);
+  const prevProductCategoriesRef = useRef(productCategories);
+  const prevProductsRef = useRef(products);
 
   // Update local state when incoming data changes (remote updates)
   useEffect(() => {
     const serverCards = initialData.cards || [];
     const serverTags = initialData.tagsConfig || DEFAULT_TAGS;
+    const serverUsers = initialData.users || [];
+    const serverBrands = initialData.brands || [];
+    const serverProductCategories = initialData.productCategories || [];
+    const serverProducts = initialData.products || [];
 
     if (saveStatus === "saved") {
       const cardsMatch = JSON.stringify(serverCards) === JSON.stringify(cards);
       const tagsMatch = JSON.stringify(serverTags) === JSON.stringify(tagsConfig);
+      const serverCustomers = initialData.customers || [];
+      const customersMatch = JSON.stringify(serverCustomers) === JSON.stringify(customers);
+      const usersMatch = JSON.stringify(serverUsers) === JSON.stringify(users);
+      const brandsMatch = JSON.stringify(serverBrands) === JSON.stringify(brands);
+      const categoriesMatch = JSON.stringify(serverProductCategories) === JSON.stringify(productCategories);
+      const productsMatch = JSON.stringify(serverProducts) === JSON.stringify(products);
 
       if (!cardsMatch) {
         setCards(serverCards);
@@ -75,6 +117,26 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         setTagsConfig(serverTags);
         prevTagsRef.current = serverTags;
       }
+      if (!customersMatch) {
+        setCustomers(serverCustomers);
+        prevCustomersRef.current = serverCustomers;
+      }
+      if (!usersMatch) {
+        setUsers(serverUsers);
+        prevUsersRef.current = serverUsers;
+      }
+      if (!brandsMatch) {
+        setBrands(serverBrands);
+        prevBrandsRef.current = serverBrands;
+      }
+      if (!categoriesMatch) {
+        setProductCategories(serverProductCategories);
+        prevProductCategoriesRef.current = serverProductCategories;
+      }
+      if (!productsMatch) {
+        setProducts(serverProducts);
+        prevProductsRef.current = serverProducts;
+      }
     }
   }, [initialData, saveStatus]);
 
@@ -82,7 +144,13 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   useEffect(() => {
     const cardsChanged = JSON.stringify(prevCardsRef.current) !== JSON.stringify(cards);
     const tagsChanged = JSON.stringify(prevTagsRef.current) !== JSON.stringify(tagsConfig);
-    const shouldSave = cardsChanged || tagsChanged;
+    const customersChanged = JSON.stringify(prevCustomersRef.current) !== JSON.stringify(customers);
+    const usersChanged = JSON.stringify(prevUsersRef.current) !== JSON.stringify(users);
+    const brandsChanged = JSON.stringify(prevBrandsRef.current) !== JSON.stringify(brands);
+    const categoriesChanged = JSON.stringify(prevProductCategoriesRef.current) !== JSON.stringify(productCategories);
+    const productsChanged = JSON.stringify(prevProductsRef.current) !== JSON.stringify(products);
+
+    const shouldSave = cardsChanged || tagsChanged || customersChanged || usersChanged || brandsChanged || categoriesChanged || productsChanged;
 
     if (shouldSave) {
       const saveData = async () => {
@@ -101,13 +169,23 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
               notified: !!c.notified,
               notifiedTime: c.notifiedTime || ""
             })), 
-            tagsConfig 
+            tagsConfig,
+            customers,
+            users,
+            brands,
+            productCategories,
+            products
           });
           setSaveStatus("saved");
           prevCardsRef.current = cards;
           prevTagsRef.current = tagsConfig;
-        } catch (err) {
-          console.error("Save error:", err);
+          prevCustomersRef.current = customers;
+          prevUsersRef.current = users;
+          prevBrandsRef.current = brands;
+          prevProductCategoriesRef.current = productCategories;
+          prevProductsRef.current = products;
+        } catch (error) {
+          console.error("Save error:", error);
           setSaveStatus("error");
         }
       };
@@ -115,46 +193,122 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const timer = setTimeout(saveData, 2000); // Increased debounce to 2s
       return () => clearTimeout(timer);
     }
-  }, [cards, tagsConfig]);
+  }, [cards, tagsConfig, customers]);
 
   const handleCreateCard = () => {
-    const targetTab = activeTab === 0 ? 1 : activeTab;
+    setIsCreatingCard(true);
+    if (activeTab === 0) setActiveTab(1);
+  };
+
+  const createCardConfirmed = (updates: Partial<KanbanCard>) => {
+    const targetTabId = activeTab === 0 ? 1 : activeTab;
+    const actionName = TAB_NAMES[targetTabId];
+    const log = `${username} - Tạo thẻ mới tại ${actionName} - ${getTimeFormatted()}`;
+    
     const newCard: KanbanCard = {
       id: `card-${Date.now()}`,
-      tabId: targetTab,
-      name: "MỚI",
-      note: "",
-      doDate: "",
+      tabId: targetTabId,
+      name: updates.name || "MỚI",
+      note: updates.note || "",
+      doDate: updates.doDate || "",
       startDate: getTodayFormatted(),
       tags: [],
-      logs: [`${username} - Tạo thẻ mới - ${getTimeFormatted()}`],
+      logs: [log],
+      collapsed: false,
+      doctorText: "",
+      doctorDate: "",
+      doctorHidden: false,
+      notified: false,
+      notifiedTime: "",
+      doneDate: ""
     };
-    setCards([newCard, ...cards]);
-    if (activeTab === 0) setActiveTab(1);
-    setEditingCardId(newCard.id);
+    
+    setCards(prev => [newCard, ...prev]);
+    setIsCreatingCard(false);
   };
 
   const updateCard = (cardId: string, updates: Partial<KanbanCard>) => {
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...updates } : c));
   };
 
+  const confirmAction = (message: string, action: () => void) => {
+    setConfirmConfig({ 
+      message, 
+      action: () => {
+        action();
+        setConfirmConfig(null);
+      } 
+    });
+  };
+
   const moveCard = (cardId: string, targetTabId: number) => {
     const card = cards.find(c => c.id === cardId);
     if (!card) return;
 
-    let updates: Partial<KanbanCard> = { tabId: targetTabId };
-    const actionName = TAB_NAMES[targetTabId];
-    const log = `${username} - Chuyển sang ${actionName} - ${getTimeFormatted()}`;
-    updates.logs = [log, ...card.logs];
+    confirmAction(`Bạn có chắc chắn muốn chuyển thẻ này sang ${TAB_NAMES[targetTabId]}?`, () => {
+      const actionName = TAB_NAMES[targetTabId];
+      const log = `${username} - Chuyển sang ${actionName} - ${getTimeFormatted()}`;
 
-    if (targetTabId === 6) {
-      updates.doneDate = getTodayFormatted();
-      updates.collapsed = true;
-    } else {
-      updates.collapsed = false;
-    }
+      setCards(prev => prev.map(c => {
+        if (c.id !== cardId) return c;
+        
+        let updates: Partial<KanbanCard> = { 
+          tabId: targetTabId,
+          logs: [log, ...c.logs]
+        };
+        
+        if (targetTabId === 6) {
+          updates.collapsed = true;
+          updates.doneDate = getTodayFormatted();
+        } else {
+          updates.collapsed = false;
+        }
+        
+        return { ...c, ...updates };
+      }));
+    });
+  };
 
-    updateCard(cardId, updates);
+  const moveBackFromXong = (cardId: string) => {
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    confirmAction("Bạn có chắc chắn muốn quay lại bước trước?", () => {
+      setCards(prev => prev.map(c => {
+        if (c.id !== cardId) return c;
+
+        const moveLogs = c.logs.filter(l => l.includes("Chuyển sang"));
+        const prevMoveLog = moveLogs[1];
+        
+        let prevTabId = 1; // Default back to Tư vấn if no history
+        if (prevMoveLog) {
+          for (const [id, name] of Object.entries(TAB_NAMES)) {
+            if (prevMoveLog.includes(`Chuyển sang ${name}`) || prevMoveLog.includes(`Chuyển sang ${id}.`)) {
+              prevTabId = parseInt(id);
+              break;
+            }
+          }
+        }
+
+        // Remove only the latest "Chuyển sang Xong" log
+        let removed = false;
+        const newLogs = c.logs.filter(l => {
+          if (!removed && (l.includes(`Chuyển sang ${TAB_NAMES[6]}`) || l.includes("Chuyển sang 6. Xong"))) {
+            removed = true;
+            return false;
+          }
+          return true;
+        });
+        
+        return { 
+          ...c, 
+          tabId: prevTabId, 
+          collapsed: false,
+          doneDate: "",
+          logs: newLogs
+        };
+      }));
+    });
   };
 
   const deleteCard = (cardId: string) => {
@@ -170,15 +324,22 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
   const filteredCards = useMemo(() => {
     let list = cards;
+    
+    if (searchQuery) {
+      // If there's a search query, search across ALL cards
+      return cards.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => {
+          const dateA = parseDateString(a.doDate);
+          const dateB = parseDateString(b.doDate);
+          return dateA.getTime() - dateB.getTime();
+        });
+    }
+
     if (activeTab === 0) {
       const todayStr = getTodayFormatted();
       list = cards.filter(c => c.doDate === todayStr && c.tabId !== 6);
     } else {
       list = cards.filter(c => c.tabId === activeTab);
-    }
-
-    if (searchQuery) {
-      list = list.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
     // Sort by doDate
@@ -217,15 +378,40 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             <span className="hidden sm:inline">{saveStatus === "saving" ? "Đang lưu" : saveStatus === "saved" ? "Đã lưu" : "Lỗi lưu"}</span>
           </div>
           
+          {currentUserRole === 'Admin' && (
+            <>
+              <button 
+                onClick={() => setShowTagManagement(true)}
+                className="text-sm font-bold bg-violet-50 text-violet-500 px-4 py-3 rounded-2xl border border-violet-100 active:scale-95 transition-all text-center flex items-center min-h-[48px]"
+              >
+                Quản lý Tag
+              </button>
+
+              <button 
+                onClick={() => setShowAccountManagement(true)}
+                className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center border border-indigo-100 active:scale-95 transition-all shrink-0"
+              >
+                <Shield className="w-6 h-6" />
+              </button>
+
+              <button 
+                onClick={() => setShowProductManagement(true)}
+                className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100 active:scale-95 transition-all shrink-0"
+              >
+                <Package className="w-6 h-6" />
+              </button>
+            </>
+          )}
+
           <button 
-            onClick={() => setShowTagManagement(true)}
-            className="text-sm font-bold bg-violet-50 text-violet-500 px-4 py-3 rounded-2xl border border-violet-100 active:scale-95 transition-all text-center flex items-center min-h-[48px]"
+            onClick={() => setShowCustomerManagement(true)}
+            className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-500 flex items-center justify-center border border-violet-100 active:scale-95 transition-all shrink-0"
           >
-            Quản lý Tag
+            <Users className="w-6 h-6" />
           </button>
           
           <button 
-            onClick={onLogout}
+            onClick={() => confirmAction("Bạn có chắc chắn muốn đăng xuất?", onLogout)}
             className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all shrink-0"
           >
             <LogOut className="w-6 h-6" />
@@ -265,14 +451,18 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             <Card 
               key={card.id}
               card={card}
+              customers={customers}
               index={index}
               onEdit={() => setEditingCardId(card.id)}
               onMove={(tid) => moveCard(card.id, tid)}
+              onMoveBack={() => moveBackFromXong(card.id)}
               onTagEdit={() => setTagModalCardId(card.id)}
               onHistory={() => setHistoryCardId(card.id)}
               onNoteEdit={() => setNoteEditCardId(card.id)}
               onDoctorReply={() => setDoctorReplyCardId(card.id)}
-              onNotify={() => addLog(card.id, "Báo khách")}
+              onNotify={() => {
+                confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
+              }}
               updateCard={updateCard}
             />
           ))
@@ -294,18 +484,39 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       </div>
 
       {/* Modals */}
+      {isCreatingCard && (
+        <CardEditModal 
+          card={{ id: 'temp', name: 'MỚI', tabId: 1, note: '', doDate: '', startDate: '', tags: [], logs: [], collapsed: false, doctorText: '', doctorDate: '', doctorHidden: false, notified: false, notifiedTime: '', doneDate: '' }}
+          customers={customers}
+          onClose={() => setIsCreatingCard(false)}
+          onSave={(updates) => createCardConfirmed(updates)}
+          onDelete={() => setIsCreatingCard(false)}
+        />
+      )}
+
       {editingCardId && (
         <CardEditModal 
           card={cards.find(c => c.id === editingCardId)!}
+          customers={customers}
           onClose={() => setEditingCardId(null)}
           onSave={(updates) => {
             updateCard(editingCardId, updates);
             setEditingCardId(null);
           }}
           onDelete={() => {
-            deleteCard(editingCardId);
-            setEditingCardId(null);
+            confirmAction("Bạn có chắc chắn muốn xóa thẻ này?", () => {
+              deleteCard(editingCardId);
+              setEditingCardId(null);
+            });
           }}
+        />
+      )}
+
+      {showCustomerManagement && (
+        <CustomerManagementModal 
+          customers={customers}
+          onClose={() => setShowCustomerManagement(false)}
+          onUpdateCustomers={(newCustomers) => setCustomers(newCustomers)}
         />
       )}
 
@@ -362,6 +573,34 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             addLog(doctorReplyCardId, "Bác sĩ phản hồi");
             setDoctorReplyCardId(null);
           }}
+        />
+      )}
+
+      {showAccountManagement && (
+        <AccountManagementModal 
+          accounts={users}
+          onUpdateAccounts={setUsers}
+          onClose={() => setShowAccountManagement(false)}
+        />
+      )}
+
+      {showProductManagement && (
+        <ProductManagementModal 
+          brands={brands}
+          categories={productCategories}
+          products={products}
+          onUpdateBrands={setBrands}
+          onUpdateCategories={setProductCategories}
+          onUpdateProducts={setProducts}
+          onClose={() => setShowProductManagement(false)}
+        />
+      )}
+
+      {confirmConfig && (
+        <ConfirmDialog 
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.action}
+          onCancel={() => setConfirmConfig(null)}
         />
       )}
     </div>

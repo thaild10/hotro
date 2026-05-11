@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { 
   User as UserIcon, 
   Pencil, 
@@ -8,10 +8,13 @@ import {
   CheckCircle,
   History,
   Clock,
-  Notebook
+  Notebook,
+  X,
+  RotateCcw
 } from "lucide-react";
 import { cn, getTodayFormatted, getTimeFormatted } from "../lib/utils";
-import { KanbanCard, TAB_NAMES } from "../types";
+import { KanbanCard, TAB_NAMES, Customer } from "../types";
+import { motion, AnimatePresence } from "motion/react";
 
 // Helper for tag colors (similar to logic in HTML)
 const TAG_COLOR_PALETTE = [
@@ -36,9 +39,11 @@ function getTagColors(tagText: string) {
 interface CardProps {
   key?: string | number;
   card: KanbanCard;
+  customers?: Customer[];
   index: number;
   onEdit: () => void;
   onMove: (tabId: number) => void;
+  onMoveBack?: () => void;
   onTagEdit: () => void;
   onHistory: () => void;
   onNoteEdit: () => void;
@@ -49,9 +54,11 @@ interface CardProps {
 
 export default function Card({ 
   card, 
+  customers = [],
   index, 
   onEdit, 
   onMove, 
+  onMoveBack,
   onTagEdit, 
   onHistory, 
   onNoteEdit, 
@@ -59,6 +66,7 @@ export default function Card({
   onNotify,
   updateCard
 }: CardProps) {
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const isDone = card.tabId === 6;
   const isCollapsed = card.collapsed;
 
@@ -74,6 +82,8 @@ export default function Card({
     onNotify();
   };
 
+  const customer = customers.find(c => c.name.toLowerCase() === card.name.toLowerCase());
+
   return (
     <div className={cn(
       "bg-white rounded-[32px] p-5 shadow-sm border border-pastel-border relative transition-all",
@@ -85,23 +95,33 @@ export default function Card({
           <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-500 text-xs font-black flex items-center justify-center shrink-0">
             {index + 1}
           </span>
-          <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center shrink-0 text-rose-400">
-            <UserIcon className="w-5 h-5 fill-current" />
+          <div 
+            onClick={() => customer?.imageUrl && setSelectedImageUrl(customer.imageUrl)}
+            className={cn(
+              "w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center shrink-0 text-rose-400 overflow-hidden",
+              customer?.imageUrl && "cursor-pointer"
+            )}
+          >
+            {customer?.imageUrl ? (
+              <img src={customer.imageUrl} alt={card.name} className="w-full h-full object-cover" />
+            ) : (
+              <UserIcon className="w-5 h-5 fill-current" />
+            )}
           </div>
-          <span className="font-bold text-base uppercase tracking-wide truncate max-w-[120px]">
-            {card.name}
-          </span>
+          <div className="flex flex-col">
+            <span 
+              onClick={onEdit}
+              className="font-bold text-base uppercase tracking-wide truncate max-w-[150px] cursor-pointer hover:text-rose-500 transition-colors"
+            >
+              {card.name}
+            </span>
+            <span className="text-[10px] font-bold text-pastel-subtext italic">(ấn vào tên để sửa toàn bộ thẻ)</span>
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
           {!isCollapsed && (
             <>
-              <button 
-                onClick={onEdit} 
-                className="text-xs font-black text-pastel-subtext bg-pastel-bg px-4 py-2.5 rounded-2xl border border-pastel-border active:scale-95 transition-all min-h-[40px]"
-              >
-                Sửa thẻ
-              </button>
               <button 
                 onClick={onDoctorReply} 
                 className={cn(
@@ -250,22 +270,40 @@ export default function Card({
                     onClick={() => onMove(2)}
                     className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sky-500 font-bold text-xs border border-sky-100 active:scale-95 min-h-[40px]"
                   >
-                    2. Gửi hàng
+                    Đã thanh toán
                   </button>
+                  <button 
+                    onClick={() => onMove(6)}
+                    className="px-4 py-2.5 rounded-2xl bg-rose-50 text-rose-500 font-bold text-xs border border-rose-100 active:scale-95 min-h-[40px]"
+                  >
+                    Không lấy
+                  </button>
+                </>
+              )}
+              {card.tabId === 2 && (
+                <>
                   <button 
                     onClick={() => onMove(3)}
                     className="px-4 py-2.5 rounded-2xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 min-h-[40px]"
                   >
-                    3. Add/Dò
+                    Đã nhận
                   </button>
                 </>
               )}
-              {card.tabId !== 6 && (
+              {card.tabId !== 1 && card.tabId !== 2 && card.tabId !== 6 && (
                 <button 
                   onClick={() => onMove(6)}
                   className="px-4 py-2.5 rounded-2xl bg-rose-50 text-rose-500 font-bold text-xs border border-rose-100 active:scale-95 min-h-[40px]"
                 >
-                  6. Xong
+                  Xong
+                </button>
+              )}
+              {isDone && (
+                <button 
+                  onClick={onMoveBack}
+                  className="px-4 py-2.5 rounded-2xl bg-slate-50 text-slate-500 font-bold text-xs border border-slate-200 active:scale-95 min-h-[40px] flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Quay lại
                 </button>
               )}
               <button 
@@ -278,6 +316,24 @@ export default function Card({
           </div>
         </div>
       )}
+
+      {/* Image View Overlay */}
+      <AnimatePresence>
+        {selectedImageUrl && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center p-8"
+            onClick={() => setSelectedImageUrl(null)}
+          >
+            <button className="absolute top-6 right-6 p-3 bg-white/10 rounded-full text-white">
+              <X className="w-8 h-8" />
+            </button>
+            <img src={selectedImageUrl} alt="full" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -35,7 +35,8 @@ service cloud.firestore {
                data.tagsConfig is map &&
                // Limit array sizes to avoid DoW (Denial of Wallet)
                data.cards.size() <= 1000 &&
-               data.keys().size() == 2;
+               data.keys().hasAll(['cards', 'tagsConfig']) &&
+               (data.keys().size() == 2 || (data.keys().hasAll(['customers']) && data.keys().size() == 3));
       }
 
       allow get: if isOwner(username);

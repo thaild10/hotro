@@ -19,9 +19,25 @@
               "$ref": "#/entities/Tag"
             }
           }
+        },
+        "customers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/Customer"
+          }
         }
       },
       "required": ["cards", "tagsConfig"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "A customer profile.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      }
     },
     "KanbanCard": {
       "title": "KanbanCard",
