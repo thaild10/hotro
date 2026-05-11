@@ -49,6 +49,12 @@
           "items": {
             "$ref": "#/entities/Product"
           }
+        },
+        "skinAudits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/SkinAuditEntry"
+          }
         }
       },
       "required": ["cards", "tagsConfig"]
@@ -138,6 +144,20 @@
       "properties": {
         "text": { "type": "string" },
         "color": { "type": "string" }
+      }
+    },
+    "SkinAuditEntry": {
+      "title": "SkinAuditEntry",
+      "description": "An entry in the skin audit log.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "month": { "type": "string" },
+        "type": { "type": "string", "enum": ["Khám", "Kiểm tra"] },
+        "date": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" }
       }
     }
   },

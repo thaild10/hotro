@@ -74,6 +74,16 @@ export interface Product {
   };
 }
 
+export interface SkinAuditEntry {
+  id: string;
+  customerId: string;
+  month: string; // "YYYY-MM"
+  type: 'Khám' | 'Kiểm tra';
+  date: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface AppData {
   cards: KanbanCard[];
   tagsConfig: Record<number, Tag[]>;
@@ -82,6 +92,7 @@ export interface AppData {
   brands?: Brand[];
   productCategories?: ProductCategory[];
   products?: Product[];
+  skinAudits?: SkinAuditEntry[];
 }
 
 export const TAB_NAMES: Record<number, string> = {
@@ -91,8 +102,8 @@ export const TAB_NAMES: Record<number, string> = {
   3: "3. Add/Dò",
   4: "4. Vấn đề",
   5: "5. Spa",
-  6: "Xong",
-  7: "6. Khám",
+  6: "6. Khám",
+  7: "Xong",
 };
 
 export const DEFAULT_TAGS: Record<number, Tag[]> = {
@@ -101,6 +112,6 @@ export const DEFAULT_TAGS: Record<number, Tag[]> = {
   3: [{ text: "Đang add" }, { text: "Đang dò" }],
   4: [{ text: "Ưu tiên" }],
   5: [{ text: "Theo dõi" }, { text: "Xếp lịch" }],
-  6: [],
-  7: [{ text: "Theo dõi" }],
+  6: [{ text: "Theo dõi" }],
+  7: [],
 };

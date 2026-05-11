@@ -14,7 +14,7 @@ import {
   Plus
 } from "lucide-react";
 import { cn, getTodayFormatted, getTimeFormatted } from "../lib/utils";
-import { KanbanCard, TAB_NAMES, Customer, Product } from "../types";
+import { KanbanCard, TAB_NAMES, Customer, Product, Brand } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 
 // Helper for tag colors (similar to logic in HTML)
@@ -42,6 +42,7 @@ interface CardProps {
   card: KanbanCard;
   customers?: Customer[];
   products?: Product[];
+  brands?: Brand[];
   index: number;
   onEdit: () => void;
   onMove: (tabId: number) => void;
@@ -59,6 +60,7 @@ export default function Card({
   card, 
   customers = [],
   products = [],
+  brands = [],
   index, 
   onEdit, 
   onMove, 
@@ -72,7 +74,7 @@ export default function Card({
   updateCard
 }: CardProps) {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  const isDone = card.tabId === 6;
+  const isDone = card.tabId === 7;
   const isCollapsed = card.collapsed;
 
   const handleToggleCollapse = () => {
@@ -230,7 +232,7 @@ export default function Card({
                   {card.products.filter(p => p.tag === 'Dò').map(p => {
                     const product = products.find(prod => prod.id === p.productId);
                     const prodName = product?.name || 'Unknown';
-                    const brandName = product?.brandId ? products.find(b => b.id === product.brandId)?.name : '';
+                    const brandName = product?.brandId ? brands.find(b => b.id === product.brandId)?.name : '';
                     const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
                     return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{displayName}</span>;
                   })}
@@ -245,7 +247,7 @@ export default function Card({
                   {card.products.filter(p => p.tag === 'Dò xong').map(p => {
                     const product = products.find(prod => prod.id === p.productId);
                     const prodName = product?.name || 'Unknown';
-                    const brandName = product?.brandId ? products.find(b => b.id === product.brandId)?.name : '';
+                    const brandName = product?.brandId ? brands.find(b => b.id === product.brandId)?.name : '';
                     const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
                     return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{displayName}</span>;
                   })}
@@ -270,7 +272,7 @@ export default function Card({
                   <SearchIcon className="w-4 h-4" />
                   <span className="ml-0.5">Ngày dò</span> <span>{card.doDate}</span>
                 </div>
-                {card.tabId === 6 && card.doneDate && (
+                {card.tabId === 7 && card.doneDate && (
                   <div className="flex items-center gap-1.5 text-teal-600">
                     <CheckCircle className="w-4 h-4" />
                     <span className="ml-0.5">Xong</span> <span>{card.doneDate}</span>
@@ -342,9 +344,9 @@ export default function Card({
                   </button>
                 </>
               )}
-              {card.tabId !== 1 && card.tabId !== 2 && card.tabId !== 6 && (
+              {card.tabId !== 1 && card.tabId !== 2 && card.tabId !== 7 && (
                 <button 
-                  onClick={() => onMove(6)}
+                  onClick={() => onMove(7)}
                   className="px-4 py-2.5 rounded-2xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 min-h-[40px]"
                 >
                   {card.tabId === 5 ? "Đã kiểm tra" : "Xong"}
@@ -376,7 +378,7 @@ export default function Card({
             onClick={onAddDo}
             className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 font-bold text-xs active:scale-95 transition-all shadow-sm"
           >
-            <Plus className="w-4 h-4" /> Add/Dò
+            <Plus className="w-4 h-4" /> Sửa Add/Dò
           </button>
         </div>
       )}

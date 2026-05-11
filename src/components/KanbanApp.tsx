@@ -12,7 +12,10 @@ import {
   X,
   Users,
   Shield,
-  Package
+  Package,
+  Monitor,
+  Smartphone,
+  Stethoscope
 } from "lucide-react";
 import { 
   cn, 
@@ -30,7 +33,8 @@ import {
   UserAccount,
   Brand,
   ProductCategory,
-  Product
+  Product,
+  SkinAuditEntry
 } from "../types";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -45,6 +49,7 @@ import TagSelectionModal from "./Modals/TagSelectionModal";
 import NoteEditModal from "./Modals/NoteEditModal";
 import DoctorReplyModal from "./Modals/DoctorReplyModal";
 import AddDoModal from "./Modals/AddDoModal";
+import SkinAuditModal from "./Modals/SkinAuditModal";
 import { ConfirmDialog } from "./Modals/ConfirmDialog";
 
 interface KanbanAppProps {
@@ -95,10 +100,13 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const [productCategories, setProductCategories] = useState<ProductCategory[]>(initialData.productCategories || []);
   const [products, setProducts] = useState<Product[]>(initialData.products || []);
   const [showProductManagement, setShowProductManagement] = useState(false);
+  const [skinAudits, setSkinAudits] = useState<SkinAuditEntry[]>(initialData.skinAudits || []);
+  const [showSkinAudit, setShowSkinAudit] = useState(false);
 
   const prevBrandsRef = useRef(brands);
   const prevProductCategoriesRef = useRef(productCategories);
   const prevProductsRef = useRef(products);
+  const prevSkinAuditsRef = useRef(skinAudits);
 
   // Update local state when incoming data changes (remote updates)
   useEffect(() => {
@@ -108,6 +116,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const serverBrands = initialData.brands || [];
     const serverProductCategories = initialData.productCategories || [];
     const serverProducts = initialData.products || [];
+    const serverSkinAudits = initialData.skinAudits || [];
 
     if (saveStatus === "saved") {
       const cardsMatch = JSON.stringify(serverCards) === JSON.stringify(cards);
@@ -118,6 +127,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const brandsMatch = JSON.stringify(serverBrands) === JSON.stringify(brands);
       const categoriesMatch = JSON.stringify(serverProductCategories) === JSON.stringify(productCategories);
       const productsMatch = JSON.stringify(serverProducts) === JSON.stringify(products);
+      const skinAuditsMatch = JSON.stringify(serverSkinAudits) === JSON.stringify(skinAudits);
 
       if (!cardsMatch) {
         setCards(serverCards);
@@ -147,6 +157,10 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         setProducts(serverProducts);
         prevProductsRef.current = serverProducts;
       }
+      if (!skinAuditsMatch) {
+        setSkinAudits(serverSkinAudits);
+        prevSkinAuditsRef.current = serverSkinAudits;
+      }
     }
   }, [initialData, saveStatus]);
 
@@ -159,8 +173,9 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const brandsChanged = JSON.stringify(prevBrandsRef.current) !== JSON.stringify(brands);
     const categoriesChanged = JSON.stringify(prevProductCategoriesRef.current) !== JSON.stringify(productCategories);
     const productsChanged = JSON.stringify(prevProductsRef.current) !== JSON.stringify(products);
+    const skinAuditsChanged = JSON.stringify(prevSkinAuditsRef.current) !== JSON.stringify(skinAudits);
 
-    const shouldSave = cardsChanged || tagsChanged || customersChanged || usersChanged || brandsChanged || categoriesChanged || productsChanged;
+    const shouldSave = cardsChanged || tagsChanged || customersChanged || usersChanged || brandsChanged || categoriesChanged || productsChanged || skinAuditsChanged;
 
     if (shouldSave) {
       const saveData = async () => {
@@ -185,7 +200,8 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             users,
             brands,
             productCategories,
-            products
+            products,
+            skinAudits
           });
           setSaveStatus("saved");
           prevCardsRef.current = cards;
@@ -195,6 +211,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           prevBrandsRef.current = brands;
           prevProductCategoriesRef.current = productCategories;
           prevProductsRef.current = products;
+          prevSkinAuditsRef.current = skinAudits;
         } catch (error) {
           console.error("Save error:", error);
           setSaveStatus("error");
@@ -204,7 +221,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const timer = setTimeout(saveData, 2000); // Increased debounce to 2s
       return () => clearTimeout(timer);
     }
-  }, [cards, tagsConfig, customers, users, brands, productCategories, products]);
+  }, [cards, tagsConfig, customers, users, brands, productCategories, products, skinAudits]);
 
   const handleCreateCard = () => {
     setIsCreatingCard(true);
@@ -268,7 +285,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           logs: [log, ...c.logs]
         };
         
-        if (targetTabId === 6) {
+        if (targetTabId === 7) {
           updates.collapsed = true;
           updates.doneDate = getTodayFormatted();
         } else {
@@ -304,7 +321,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         // Remove only the latest "Chuyển sang Xong" log
         let removed = false;
         const newLogs = c.logs.filter(l => {
-          if (!removed && (l.includes(`Chuyển sang ${TAB_NAMES[6]}`) || l.includes("Chuyển sang 6. Xong"))) {
+          if (!removed && (l.includes(`Chuyển sang ${TAB_NAMES[7]}`) || l.includes("Chuyển sang 7. Xong"))) {
             removed = true;
             return false;
           }
@@ -335,7 +352,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
   const overdueCards = useMemo(() => {
     const today = parseDateString(getTodayFormatted()).getTime();
-    return cards.filter(c => c.tabId !== 6 && c.doDate && parseDateString(c.doDate).getTime() <= today);
+    return cards.filter(c => c.tabId !== 7 && c.doDate && parseDateString(c.doDate).getTime() <= today);
   }, [cards]);
 
   const filteredCards = useMemo(() => {
@@ -385,7 +402,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
         <div className="flex items-center gap-3 shrink-0">
           <div className={cn(
-            "flex items-center justify-center w-12 h-12 rounded-2xl transition-all",
+            "flex items-center justify-center w-12 h-12 rounded-2xl transition-all mr-2",
             saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-200",
             saveStatus === "saved" && "bg-teal-50 text-teal-600 border border-teal-200",
             (saveStatus === "error" || saveStatus === "offline") && "bg-red-50 text-red-500 border border-red-200"
@@ -394,6 +411,19 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             {saveStatus === "saved" && <Cloud className="w-6 h-6" />}
             {(saveStatus === "error" || saveStatus === "offline") && <CloudOff className="w-6 h-6" />}
           </div>
+
+          <button 
+            onMouseEnter={() => setHoveredBtn('audit')}
+            onMouseLeave={() => setHoveredBtn(null)}
+            onClick={() => setShowSkinAudit(true)}
+            className={cn(
+              "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
+              hoveredBtn === 'audit' ? "bg-teal-500 text-white w-auto px-4" : "bg-teal-50 text-teal-500 w-12"
+            )}
+          >
+            <Stethoscope className="w-6 h-6 shrink-0" />
+            {hoveredBtn === 'audit' && <span className="text-sm font-black whitespace-nowrap">Kiểm tra da</span>}
+          </button>
           
           {currentUserRole === 'Admin' && (
             <>
@@ -455,7 +485,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             onClick={() => setDeviceView(prev => prev === 'desktop' ? 'mobile' : 'desktop')}
             className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all shrink-0"
           >
-            {deviceView === 'desktop' ? <Settings2 className="w-6 h-6" /> : <Settings2 className="w-6 h-6 text-rose-400 rotate-90" />}
+            {deviceView === 'desktop' ? <Smartphone className="w-6 h-6" /> : <Monitor className="w-6 h-6 text-rose-400" />}
           </button>
           
           <button 
@@ -509,6 +539,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
               card={card}
               customers={customers}
               products={products}
+              brands={brands}
               index={index}
               onEdit={() => setEditingCardId(card.id)}
               onMove={(tid) => moveCard(card.id, tid)}
@@ -664,6 +695,16 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             setAddDoCardId(null);
           }}
           onClose={() => setAddDoCardId(null)}
+        />
+      )}
+
+      {showSkinAudit && (
+        <SkinAuditModal 
+          customers={customers}
+          skinAudits={skinAudits}
+          username={username}
+          onUpdateAudits={setSkinAudits}
+          onClose={() => setShowSkinAudit(false)}
         />
       )}
 

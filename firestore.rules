@@ -38,6 +38,7 @@ service cloud.firestore {
                (!data.keys().hasAny(['brands']) || data.brands is list) &&
                (!data.keys().hasAny(['productCategories']) || data.productCategories is list) &&
                (!data.keys().hasAny(['products']) || data.products is list) &&
+               (!data.keys().hasAny(['skinAudits']) || data.skinAudits is list) &&
                // Limit array sizes to avoid DoW (Denial of Wallet)
                data.cards.size() <= 1000 &&
                data.keys().size() <= 15;
