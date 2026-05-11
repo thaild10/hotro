@@ -17,6 +17,7 @@ import {
   Smartphone,
   Stethoscope
 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   cn, 
   getTodayFormatted, 
@@ -34,7 +35,9 @@ import {
   Brand,
   ProductCategory,
   Product,
-  SkinAuditEntry
+  SkinAuditEntry,
+  SkinAuditLog,
+  ImageCompressionSettings
 } from "../types";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -50,6 +53,7 @@ import NoteEditModal from "./Modals/NoteEditModal";
 import DoctorReplyModal from "./Modals/DoctorReplyModal";
 import AddDoModal from "./Modals/AddDoModal";
 import SkinAuditModal from "./Modals/SkinAuditModal";
+import ImageCompressionModal from "./Modals/ImageCompressionModal";
 import { ConfirmDialog } from "./Modals/ConfirmDialog";
 
 interface KanbanAppProps {
@@ -65,6 +69,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const [users, setUsers] = useState<UserAccount[]>(initialData.users || []);
   const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "offline">("saved");
   const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
   const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
@@ -101,7 +106,12 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const [products, setProducts] = useState<Product[]>(initialData.products || []);
   const [showProductManagement, setShowProductManagement] = useState(false);
   const [skinAudits, setSkinAudits] = useState<SkinAuditEntry[]>(initialData.skinAudits || []);
+  const [skinAuditLogs, setSkinAuditLogs] = useState<SkinAuditLog[]>(initialData.skinAuditLogs || []);
+  const [compressionSettings, setCompressionSettings] = useState<ImageCompressionSettings>(
+    initialData.compressionSettings || { maxWidth: 1200, quality: 80 }
+  );
   const [showSkinAudit, setShowSkinAudit] = useState(false);
+  const [showCompressionSettings, setShowCompressionSettings] = useState(false);
 
   const prevBrandsRef = useRef(brands);
   const prevProductCategoriesRef = useRef(productCategories);
@@ -117,6 +127,8 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const serverProductCategories = initialData.productCategories || [];
     const serverProducts = initialData.products || [];
     const serverSkinAudits = initialData.skinAudits || [];
+    const serverSkinAuditLogs = initialData.skinAuditLogs || [];
+    const serverCompressionSettings = initialData.compressionSettings || { maxWidth: 1200, quality: 80 };
 
     if (saveStatus === "saved") {
       const cardsMatch = JSON.stringify(serverCards) === JSON.stringify(cards);
@@ -128,6 +140,8 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const categoriesMatch = JSON.stringify(serverProductCategories) === JSON.stringify(productCategories);
       const productsMatch = JSON.stringify(serverProducts) === JSON.stringify(products);
       const skinAuditsMatch = JSON.stringify(serverSkinAudits) === JSON.stringify(skinAudits);
+      const skinAuditLogsMatch = JSON.stringify(serverSkinAuditLogs) === JSON.stringify(skinAuditLogs);
+      const compressionSettingsMatch = JSON.stringify(serverCompressionSettings) === JSON.stringify(compressionSettings);
 
       if (!cardsMatch) {
         setCards(serverCards);
@@ -161,6 +175,12 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         setSkinAudits(serverSkinAudits);
         prevSkinAuditsRef.current = serverSkinAudits;
       }
+      if (!skinAuditLogsMatch) {
+        setSkinAuditLogs(serverSkinAuditLogs);
+      }
+      if (!compressionSettingsMatch) {
+        setCompressionSettings(serverCompressionSettings);
+      }
     }
   }, [initialData, saveStatus]);
 
@@ -174,8 +194,10 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const categoriesChanged = JSON.stringify(prevProductCategoriesRef.current) !== JSON.stringify(productCategories);
     const productsChanged = JSON.stringify(prevProductsRef.current) !== JSON.stringify(products);
     const skinAuditsChanged = JSON.stringify(prevSkinAuditsRef.current) !== JSON.stringify(skinAudits);
+    const skinAuditLogsChanged = JSON.stringify(initialData.skinAuditLogs) !== JSON.stringify(skinAuditLogs);
+    const compressionSettingsChanged = JSON.stringify(initialData.compressionSettings) !== JSON.stringify(compressionSettings);
 
-    const shouldSave = cardsChanged || tagsChanged || customersChanged || usersChanged || brandsChanged || categoriesChanged || productsChanged || skinAuditsChanged;
+    const shouldSave = cardsChanged || tagsChanged || customersChanged || usersChanged || brandsChanged || categoriesChanged || productsChanged || skinAuditsChanged || skinAuditLogsChanged || compressionSettingsChanged;
 
     if (shouldSave) {
       const saveData = async () => {
@@ -201,7 +223,9 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             brands,
             productCategories,
             products,
-            skinAudits
+            skinAudits,
+            skinAuditLogs,
+            compressionSettings
           });
           setSaveStatus("saved");
           prevCardsRef.current = cards;
@@ -388,112 +412,115 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       deviceView === 'mobile' ? "max-w-[430px] mx-auto border-x border-slate-200 shadow-2xl relative" : "w-full"
     )}>
       {/* Header */}
-      <header className="bg-white px-3 py-3 border-b border-pastel-border shrink-0 shadow-sm flex items-center justify-between gap-3">
-        <div className="flex-1 relative max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-pastel-subtext w-5 h-5" />
-          <input 
-            type="text" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-pastel-bg border-none rounded-2xl py-3 pl-12 pr-4 text-base font-bold focus:ring-2 focus:ring-rose-200 outline-none transition-all" 
-            placeholder="Tìm tên khách..."
-          />
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
+      <header className="bg-white border-b border-pastel-border shrink-0 shadow-sm overflow-hidden">
+        <div className="flex items-center h-14 md:h-16 px-3 gap-2 overflow-x-auto no-scrollbar touch-pan-x">
+          {/* Search Area */}
           <div className={cn(
-            "flex items-center justify-center w-12 h-12 rounded-2xl transition-all mr-2",
-            saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-200",
-            saveStatus === "saved" && "bg-teal-50 text-teal-600 border border-teal-200",
-            (saveStatus === "error" || saveStatus === "offline") && "bg-red-50 text-red-500 border border-red-200"
+            "relative transition-all duration-300 ease-in-out shrink-0",
+            (isSearchExpanded || searchQuery) ? "w-[240px] md:w-80" : "w-11 md:w-12"
           )}>
-            {saveStatus === "saving" && <CloudUpload className="w-6 h-6" />}
-            {saveStatus === "saved" && <Cloud className="w-6 h-6" />}
-            {(saveStatus === "error" || saveStatus === "offline") && <CloudOff className="w-6 h-6" />}
+            {(isSearchExpanded || searchQuery) ? (
+              <div className="relative w-full h-11 md:h-12">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-pastel-subtext w-5 h-5 pointer-events-none" />
+                <input 
+                  type="text" 
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onBlur={() => !searchQuery && setIsSearchExpanded(false)}
+                  className="w-full h-full bg-pastel-bg border-none rounded-xl md:rounded-2xl py-3 pl-11 md:pl-12 pr-10 text-sm md:text-base font-bold focus:ring-2 focus:ring-rose-200 outline-none transition-all" 
+                  placeholder="Tìm tên khách..."
+                />
+                <button 
+                  onClick={() => { setSearchQuery(""); setIsSearchExpanded(false); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-pastel-subtext hover:text-rose-500"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setIsSearchExpanded(true)}
+                className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-pastel-bg flex items-center justify-center text-pastel-subtext active:scale-95 transition-all"
+              >
+                <Search className="w-5 h-5 md:w-6 h-6" />
+              </button>
+            )}
           </div>
 
-          <button 
-            onMouseEnter={() => setHoveredBtn('audit')}
-            onMouseLeave={() => setHoveredBtn(null)}
-            onClick={() => setShowSkinAudit(true)}
-            className={cn(
-              "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
-              hoveredBtn === 'audit' ? "bg-teal-500 text-white w-auto px-4" : "bg-teal-50 text-teal-500 w-12"
+          {/* Feature Actions Container */}
+          <div className="flex items-center gap-2 pr-4 min-w-max">
+            <div className={cn(
+              "flex items-center justify-center w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl transition-all",
+              saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-200",
+              saveStatus === "saved" && "bg-teal-50 text-teal-600 border border-teal-200",
+              (saveStatus === "error" || saveStatus === "offline") && "bg-red-50 text-red-500 border border-red-200"
+            )}>
+              {saveStatus === "saving" && <CloudUpload className="w-5 h-5 md:w-6 h-6" />}
+              {saveStatus === "saved" && <Cloud className="w-5 h-5 md:w-6 h-6" />}
+              {(saveStatus === "error" || saveStatus === "offline") && <CloudOff className="w-5 h-5 md:w-6 h-6" />}
+            </div>
+
+            <button 
+              onClick={() => setShowCompressionSettings(true)}
+              className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center active:scale-95 transition-all shrink-0"
+            >
+              <CloudUpload className="w-5 h-5 md:w-6 h-6" />
+            </button>
+
+            <button 
+              onClick={() => setShowSkinAudit(true)}
+              className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-teal-50 text-teal-500 flex items-center justify-center active:scale-95 transition-all shrink-0"
+            >
+              <Stethoscope className="w-5 h-5 md:w-6 h-6" />
+            </button>
+            
+            {currentUserRole === 'Admin' && (
+              <>
+                <button 
+                  onClick={() => setShowTagManagement(true)}
+                  className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-violet-50 text-violet-500 flex items-center justify-center active:scale-95 transition-all shrink-0"
+                >
+                  <TagIcon className="w-5 h-5 md:w-6 h-6" />
+                </button>
+
+                <button 
+                  onClick={() => setShowAccountManagement(true)}
+                  className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center active:scale-95 transition-all shrink-0"
+                >
+                  <Shield className="w-5 h-5 md:w-6 h-6" />
+                </button>
+
+                <button 
+                  onClick={() => setShowProductManagement(true)}
+                  className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center active:scale-95 transition-all shrink-0"
+                >
+                  <Package className="w-5 h-5 md:w-6 h-6" />
+                </button>
+              </>
             )}
-          >
-            <Stethoscope className="w-6 h-6 shrink-0" />
-            {hoveredBtn === 'audit' && <span className="text-sm font-black whitespace-nowrap">Kiểm tra da</span>}
-          </button>
-          
-          {currentUserRole === 'Admin' && (
-            <>
-              <button 
-                onMouseEnter={() => setHoveredBtn('tags')}
-                onMouseLeave={() => setHoveredBtn(null)}
-                onClick={() => setShowTagManagement(true)}
-                className={cn(
-                  "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
-                  hoveredBtn === 'tags' ? "bg-violet-500 text-white w-auto px-4" : "bg-violet-50 text-violet-500 w-12"
-                )}
-              >
-                <TagIcon className="w-6 h-6 shrink-0" />
-                {hoveredBtn === 'tags' && <span className="text-sm font-black whitespace-nowrap">Quản lý Tag</span>}
-              </button>
 
-              <button 
-                onMouseEnter={() => setHoveredBtn('accounts')}
-                onMouseLeave={() => setHoveredBtn(null)}
-                onClick={() => setShowAccountManagement(true)}
-                className={cn(
-                  "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
-                  hoveredBtn === 'accounts' ? "bg-indigo-500 text-white w-auto px-4" : "bg-indigo-50 text-indigo-500 w-12"
-                )}
-              >
-                <Shield className="w-6 h-6 shrink-0" />
-                {hoveredBtn === 'accounts' && <span className="text-sm font-black whitespace-nowrap">Tài khoản</span>}
-              </button>
+            <button 
+              onClick={() => setShowCustomerManagement(true)}
+              className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center active:scale-95 transition-all shrink-0"
+            >
+              <Users className="w-5 h-5 md:w-6 h-6" />
+            </button>
 
-              <button 
-                onMouseEnter={() => setHoveredBtn('products')}
-                onMouseLeave={() => setHoveredBtn(null)}
-                onClick={() => setShowProductManagement(true)}
-                className={cn(
-                  "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
-                  hoveredBtn === 'products' ? "bg-amber-500 text-white w-auto px-4" : "bg-amber-50 text-amber-500 w-12"
-                )}
-              >
-                <Package className="w-6 h-6 shrink-0" />
-                {hoveredBtn === 'products' && <span className="text-sm font-black whitespace-nowrap">Sản phẩm</span>}
-              </button>
-            </>
-          )}
-
-          <button 
-            onMouseEnter={() => setHoveredBtn('customers')}
-            onMouseLeave={() => setHoveredBtn(null)}
-            onClick={() => setShowCustomerManagement(true)}
-            className={cn(
-              "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
-              hoveredBtn === 'customers' ? "bg-rose-500 text-white w-auto px-4" : "bg-rose-50 text-rose-500 w-12"
-            )}
-          >
-            <Users className="w-6 h-6 shrink-0" />
-            {hoveredBtn === 'customers' && <span className="text-sm font-black whitespace-nowrap">Khách hàng</span>}
-          </button>
-
-          <button 
-            onClick={() => setDeviceView(prev => prev === 'desktop' ? 'mobile' : 'desktop')}
-            className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all shrink-0"
-          >
-            {deviceView === 'desktop' ? <Smartphone className="w-6 h-6" /> : <Monitor className="w-6 h-6 text-rose-400" />}
-          </button>
-          
-          <button 
-            onClick={() => confirmAction("Bạn có chắc chắn muốn đăng xuất?", onLogout)}
-            className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all shrink-0"
-          >
-            <LogOut className="w-6 h-6" />
-          </button>
+            <button 
+              onClick={() => setDeviceView(prev => prev === 'desktop' ? 'mobile' : 'desktop')}
+              className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all shrink-0"
+            >
+              {deviceView === 'desktop' ? <Smartphone className="w-5 h-5 md:w-6 h-6" /> : <Monitor className="w-5 h-5 md:w-6 h-6 text-rose-400" />}
+            </button>
+            
+            <button 
+              onClick={() => confirmAction("Bạn có chắc chắn muốn đăng xuất?", onLogout)}
+              className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all shrink-0"
+            >
+              <LogOut className="w-5 h-5 md:w-6 h-6" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -573,140 +600,154 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       </div>
 
       {/* Modals */}
-      {isCreatingCard && (
-        <CardEditModal 
-          card={{ id: 'temp', name: 'MỚI', tabId: 1, note: '', doDate: '', startDate: '', tags: [], logs: [], collapsed: false, doctorText: '', doctorDate: '', doctorHidden: false, notified: false, notifiedTime: '', doneDate: '' }}
-          customers={customers}
-          onClose={() => setIsCreatingCard(false)}
-          onSave={(updates) => createCardConfirmed(updates)}
-          onDelete={() => setIsCreatingCard(false)}
-        />
-      )}
+      <AnimatePresence>
+        {isCreatingCard && (
+          <CardEditModal 
+            card={{ id: 'temp', name: 'MỚI', tabId: 1, note: '', doDate: '', startDate: '', tags: [], logs: [], collapsed: false, doctorText: '', doctorDate: '', doctorHidden: false, notified: false, notifiedTime: '', doneDate: '' }}
+            customers={customers}
+            onClose={() => setIsCreatingCard(false)}
+            onSave={(updates) => createCardConfirmed(updates)}
+            onDelete={() => setIsCreatingCard(false)}
+          />
+        )}
 
-      {editingCardId && (
-        <CardEditModal 
-          card={cards.find(c => c.id === editingCardId)!}
-          customers={customers}
-          onClose={() => setEditingCardId(null)}
-          onSave={(updates) => {
-            updateCard(editingCardId, updates);
-            setEditingCardId(null);
-          }}
-          onDelete={() => {
-            confirmAction("Bạn có chắc chắn muốn xóa thẻ này?", () => {
-              deleteCard(editingCardId);
+        {editingCardId && (
+          <CardEditModal 
+            card={cards.find(c => c.id === editingCardId)!}
+            customers={customers}
+            onClose={() => setEditingCardId(null)}
+            onSave={(updates) => {
+              updateCard(editingCardId, updates);
               setEditingCardId(null);
-            });
-          }}
-        />
-      )}
+            }}
+            onDelete={() => {
+              confirmAction("Bạn có chắc chắn muốn xóa thẻ này?", () => {
+                deleteCard(editingCardId);
+                setEditingCardId(null);
+              });
+            }}
+          />
+        )}
 
-      {showCustomerManagement && (
-        <CustomerManagementModal 
-          customers={customers}
-          onClose={() => setShowCustomerManagement(false)}
-          onUpdateCustomers={(newCustomers) => setCustomers(newCustomers)}
-        />
-      )}
+        {showCustomerManagement && (
+          <CustomerManagementModal 
+            customers={customers}
+            onClose={() => setShowCustomerManagement(false)}
+            onUpdateCustomers={(newCustomers) => setCustomers(newCustomers)}
+            compressionSettings={compressionSettings}
+          />
+        )}
 
-      {tagModalCardId && (
-        <TagSelectionModal 
-          card={cards.find(c => c.id === tagModalCardId)!}
-          tagsConfig={tagsConfig}
-          onClose={() => setTagModalCardId(null)}
-          onUpdateCard={(updates) => {
-            updateCard(tagModalCardId, updates);
-          }}
-        />
-      )}
+        {tagModalCardId && (
+          <TagSelectionModal 
+            card={cards.find(c => c.id === tagModalCardId)!}
+            tagsConfig={tagsConfig}
+            onClose={() => setTagModalCardId(null)}
+            onUpdateCard={(updates) => {
+              updateCard(tagModalCardId, updates);
+            }}
+          />
+        )}
 
-      {showTagManagement && (
-        <TagManagementModal 
-          tagsConfig={tagsConfig}
-          onClose={() => setShowTagManagement(false)}
-          onUpdateConfig={(newConfig) => {
-            setTagsConfig(newConfig);
-          }}
-        />
-      )}
+        {showTagManagement && (
+          <TagManagementModal 
+            tagsConfig={tagsConfig}
+            onClose={() => setShowTagManagement(false)}
+            onUpdateConfig={(newConfig) => {
+              setTagsConfig(newConfig);
+            }}
+          />
+        )}
 
-      {historyCardId && (
-        <CardHistoryModal 
-          card={cards.find(c => c.id === historyCardId)!}
-          onClose={() => setHistoryCardId(null)}
-        />
-      )}
+        {historyCardId && (
+          <CardHistoryModal 
+            card={cards.find(c => c.id === historyCardId)!}
+            onClose={() => setHistoryCardId(null)}
+          />
+        )}
 
-      {noteEditCardId && (
-        <NoteEditModal 
-          card={cards.find(c => c.id === noteEditCardId)!}
-          onClose={() => setNoteEditCardId(null)}
-          onSave={(newNote) => {
-            updateCard(noteEditCardId, { note: newNote });
-            setNoteEditCardId(null);
-          }}
-        />
-      )}
+        {noteEditCardId && (
+          <NoteEditModal 
+            card={cards.find(c => c.id === noteEditCardId)!}
+            onClose={() => setNoteEditCardId(null)}
+            onSave={(newNote) => {
+              updateCard(noteEditCardId, { note: newNote });
+              setNoteEditCardId(null);
+            }}
+          />
+        )}
 
-      {doctorReplyCardId && (
-        <DoctorReplyModal 
-          card={cards.find(c => c.id === doctorReplyCardId)!}
-          onClose={() => setDoctorReplyCardId(null)}
-          onSave={(reply) => {
-            const updates: Partial<KanbanCard> = { 
-              doctorText: reply,
-              doctorDate: getTodayFormatted(),
-              doctorHidden: !reply 
-            };
-            updateCard(doctorReplyCardId, updates);
-            addLog(doctorReplyCardId, "Bác sĩ phản hồi");
-            setDoctorReplyCardId(null);
-          }}
-        />
-      )}
+        {doctorReplyCardId && (
+          <DoctorReplyModal 
+            card={cards.find(c => c.id === doctorReplyCardId)!}
+            onClose={() => setDoctorReplyCardId(null)}
+            onSave={(reply) => {
+              const updates: Partial<KanbanCard> = { 
+                doctorText: reply,
+                doctorDate: getTodayFormatted(),
+                doctorHidden: !reply 
+              };
+              updateCard(doctorReplyCardId, updates);
+              addLog(doctorReplyCardId, "Bác sĩ phản hồi");
+              setDoctorReplyCardId(null);
+            }}
+          />
+        )}
 
-      {showAccountManagement && (
-        <AccountManagementModal 
-          accounts={users}
-          onUpdateAccounts={setUsers}
-          onClose={() => setShowAccountManagement(false)}
-        />
-      )}
+        {showAccountManagement && (
+          <AccountManagementModal 
+            accounts={users}
+            onUpdateAccounts={setUsers}
+            onClose={() => setShowAccountManagement(false)}
+          />
+        )}
 
-      {showProductManagement && (
-        <ProductManagementModal 
-          brands={brands}
-          categories={productCategories}
-          products={products}
-          onUpdateBrands={setBrands}
-          onUpdateCategories={setProductCategories}
-          onUpdateProducts={setProducts}
-          onClose={() => setShowProductManagement(false)}
-        />
-      )}
+        {showProductManagement && (
+          <ProductManagementModal 
+            brands={brands}
+            categories={productCategories}
+            products={products}
+            onUpdateBrands={setBrands}
+            onUpdateCategories={setProductCategories}
+            onUpdateProducts={setProducts}
+            onClose={() => setShowProductManagement(false)}
+            compressionSettings={compressionSettings}
+          />
+        )}
 
-      {addDoCardId && (
-        <AddDoModal
-          initialProducts={cards.find(c => c.id === addDoCardId)?.products || []}
-          availableProducts={products}
-          availableBrands={brands}
-          onSave={(updatedProducts) => {
-            updateCard(addDoCardId, { products: updatedProducts });
-            setAddDoCardId(null);
-          }}
-          onClose={() => setAddDoCardId(null)}
-        />
-      )}
+        {addDoCardId && (
+          <AddDoModal
+            initialProducts={cards.find(c => c.id === addDoCardId)?.products || []}
+            availableProducts={products}
+            availableBrands={brands}
+            onSave={(updatedProducts) => {
+              updateCard(addDoCardId, { products: updatedProducts });
+              setAddDoCardId(null);
+            }}
+            onClose={() => setAddDoCardId(null)}
+          />
+        )}
 
-      {showSkinAudit && (
-        <SkinAuditModal 
-          customers={customers}
-          skinAudits={skinAudits}
-          username={username}
-          onUpdateAudits={setSkinAudits}
-          onClose={() => setShowSkinAudit(false)}
-        />
-      )}
+        {showSkinAudit && (
+          <SkinAuditModal 
+            customers={customers}
+            skinAudits={skinAudits}
+            skinAuditLogs={skinAuditLogs}
+            username={username}
+            onUpdateAudits={setSkinAudits}
+            onUpdateLogs={setSkinAuditLogs}
+            onClose={() => setShowSkinAudit(false)}
+          />
+        )}
+
+        {showCompressionSettings && (
+          <ImageCompressionModal 
+            settings={compressionSettings}
+            onUpdateSettings={setCompressionSettings}
+            onClose={() => setShowCompressionSettings(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {confirmConfig && (
         <ConfirmDialog 

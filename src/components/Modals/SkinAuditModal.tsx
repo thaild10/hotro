@@ -1,18 +1,28 @@
 import React, { useState, useMemo } from "react";
 import { X, Search, Calendar, History, ArrowDownAZ, ArrowUpZA, Pencil, Trash2, Save, Stethoscope, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Customer, SkinAuditEntry } from "../../types";
+import { Customer, SkinAuditEntry, SkinAuditLog } from "../../types";
 import { cn, getTodayFormatted, getTimeFormatted } from "../../lib/utils";
 
 interface SkinAuditModalProps {
   customers: Customer[];
   skinAudits: SkinAuditEntry[];
+  skinAuditLogs: SkinAuditLog[];
   username: string;
   onUpdateAudits: (audits: SkinAuditEntry[]) => void;
+  onUpdateLogs: (logs: SkinAuditLog[]) => void;
   onClose: () => void;
 }
 
-export default function SkinAuditModal({ customers, skinAudits, username, onUpdateAudits, onClose }: SkinAuditModalProps) {
+export default function SkinAuditModal({ 
+  customers, 
+  skinAudits, 
+  skinAuditLogs,
+  username, 
+  onUpdateAudits, 
+  onUpdateLogs,
+  onClose 
+}: SkinAuditModalProps) {
   const [search, setSearch] = useState("");
   const [sortType, setSortType] = useState<'a-z' | 'z-a' | 'last-audit' | 'not-audited-this-month'>('last-audit');
   const [showHistoryId, setShowHistoryId] = useState<string | null>(null);
@@ -74,120 +84,145 @@ export default function SkinAuditModal({ customers, skinAudits, username, onUpda
       createdAt: new Date().toISOString()
     };
     onUpdateAudits([...skinAudits, newEntry]);
+
+    const newLog: SkinAuditLog = {
+      id: `log-${Date.now()}`,
+      customerId,
+      action: 'create',
+      type,
+      month,
+      date,
+      user: username,
+      timestamp: new Date().toISOString()
+    };
+    onUpdateLogs([newLog, ...skinAuditLogs]);
   };
 
   const handleDelete = (id: string) => {
+    const entry = skinAudits.find(e => e.id === id);
+    if (!entry) return;
+
     onUpdateAudits(skinAudits.filter(e => e.id !== id));
+
+    const newLog: SkinAuditLog = {
+      id: `log-${Date.now()}`,
+      customerId: entry.customerId,
+      action: 'delete',
+      type: entry.type,
+      month: entry.month,
+      date: entry.date,
+      user: username,
+      timestamp: new Date().toISOString()
+    };
+    onUpdateLogs([newLog, ...skinAuditLogs]);
   };
 
   const handleUpdateDate = (id: string, newDate: string) => {
+    const entry = skinAudits.find(e => e.id === id);
+    if (!entry) return;
+
     onUpdateAudits(skinAudits.map(e => e.id === id ? { ...e, date: newDate } : e));
+
+    const newLog: SkinAuditLog = {
+      id: `log-${Date.now()}`,
+      customerId: entry.customerId,
+      action: 'update',
+      type: entry.type,
+      month: entry.month,
+      date: newDate,
+      user: username,
+      timestamp: new Date().toISOString()
+    };
+    onUpdateLogs([newLog, ...skinAuditLogs]);
     setEditingId(null);
   };
 
   return (
-    <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-pastel-bg w-full max-w-5xl h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden border-4 border-white"
-      >
-        {/* Header */}
-        <div className="bg-white px-8 py-6 flex items-center justify-between border-b border-pastel-border shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-teal-500 flex items-center justify-center text-white shadow-lg shadow-teal-100">
-              <Stethoscope className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-800">Kiểm tra da</h2>
-              <p className="text-xs font-bold text-pastel-subtext uppercase tracking-wider">Theo dõi lịch khám khách hàng</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-3 hover:bg-rose-50 rounded-2xl transition-colors text-slate-400 hover:text-rose-500">
-            <X className="w-6 h-6" />
+    <motion.div 
+      initial={{ x: "100%" }}
+      animate={{ x: 0 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", damping: 30, stiffness: 300 }}
+      className="fixed inset-0 bg-pastel-bg z-[1000] flex flex-col md:max-w-[430px] md:mx-auto md:border-x md:border-slate-200"
+    >
+      {/* Page Header */}
+      <div className="bg-white px-4 h-16 flex items-center gap-3 border-b border-pastel-border shrink-0">
+        <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl transition-colors active:scale-95 flex items-center gap-2">
+          <ChevronLeft className="w-6 h-6 text-slate-600" />
+          <span className="font-black text-slate-600 text-sm">Quay lại</span>
+        </button>
+        <div className="h-6 w-[1px] bg-slate-200 mx-1" />
+        <h3 className="font-black text-lg text-teal-500 uppercase tracking-tight">Khám da</h3>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white px-4 py-3 flex flex-col gap-3 border-b border-pastel-border shrink-0">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-subtext" />
+          <input 
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Tìm tên khách hàng..."
+            className="w-full pl-10 pr-4 py-3 bg-pastel-bg rounded-xl text-sm font-bold border border-transparent outline-none focus:border-teal-400 transition-colors"
+          />
+        </div>
+        <div className="flex bg-pastel-bg rounded-xl p-1 shrink-0 overflow-x-auto no-scrollbar">
+          <button 
+            onClick={() => setSortType('last-audit')}
+            className={cn("px-4 py-1.5 rounded-lg text-[10px] whitespace-nowrap font-black uppercase transition-all", sortType === 'last-audit' ? "bg-teal-500 text-white shadow-md shadow-teal-100" : "text-pastel-subtext hover:bg-white/50")}
+          >
+            Gần nhất
+          </button>
+          <button 
+            onClick={() => setSortType('not-audited-this-month')}
+            className={cn("px-4 py-1.5 rounded-lg text-[10px] whitespace-nowrap font-black uppercase transition-all ml-1", sortType === 'not-audited-this-month' ? "bg-teal-500 text-white shadow-md shadow-teal-100" : "text-pastel-subtext hover:bg-white/50")}
+          >
+            Chưa khám
+          </button>
+          <button 
+            onClick={() => setSortType('a-z')}
+            className={cn("px-4 py-1.5 rounded-lg text-[10px] whitespace-nowrap font-black uppercase transition-all ml-1", sortType === 'a-z' ? "bg-teal-500 text-white shadow-md shadow-teal-100" : "text-pastel-subtext hover:bg-white/50")}
+          >
+            A-Z
           </button>
         </div>
+      </div>
 
-        {/* Filters */}
-        <div className="bg-white/50 px-8 py-4 flex flex-wrap items-center gap-4 border-b border-pastel-border shrink-0">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-subtext" />
-            <input 
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Tìm tên khách hàng..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl text-sm font-bold border border-pastel-border outline-none focus:border-teal-400 transition-colors shadow-sm"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase text-pastel-subtext whitespace-nowrap">Sắp xếp:</span>
-            <div className="flex bg-white rounded-xl p-1 border border-pastel-border shadow-sm">
-              <button 
-                onClick={() => setSortType('last-audit')}
-                className={cn("px-3 py-1.5 rounded-lg text-xs font-black transition-all", sortType === 'last-audit' ? "bg-teal-500 text-white" : "text-pastel-subtext hover:bg-pastel-bg")}
-              >
-                Gần nhất
-              </button>
-              <button 
-                onClick={() => setSortType('a-z')}
-                className={cn("px-3 py-1.5 rounded-lg text-xs font-black transition-all", sortType === 'a-z' ? "bg-teal-500 text-white" : "text-pastel-subtext hover:bg-pastel-bg")}
-              >
-                <ArrowDownAZ className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={() => setSortType('z-a')}
-                className={cn("px-3 py-1.5 rounded-lg text-xs font-black transition-all", sortType === 'z-a' ? "bg-teal-500 text-white" : "text-pastel-subtext hover:bg-pastel-bg")}
-              >
-                <ArrowUpZA className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={() => setSortType('not-audited-this-month')}
-                className={cn("px-3 py-1.5 rounded-lg text-xs font-black transition-all", sortType === 'not-audited-this-month' ? "bg-teal-500 text-white" : "text-pastel-subtext hover:bg-pastel-bg")}
-              >
-                Chưa khám
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Horizontal Table for Mobile-Friendly view */}
+      <div className="flex-1 overflow-y-auto no-scrollbar bg-slate-50">
+        <div className="p-4 space-y-4 pb-20">
+          {sortedCustomers.map((customer, idx) => {
+            return (
+              <div key={customer.id} className="bg-white p-4 rounded-3xl border border-pastel-border shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black text-pastel-subtext w-5">{idx + 1}.</span>
+                    <span className="font-bold text-slate-800">{customer.name}</span>
+                  </div>
+                  <button 
+                    onClick={() => setShowHistoryId(showHistoryId === customer.id ? null : customer.id)}
+                    className="p-2 bg-slate-50 text-slate-400 rounded-xl active:scale-90 transition-transform"
+                  >
+                    <History className="w-5 h-5" />
+                  </button>
+                </div>
 
-        {/* Table Container */}
-        <div className="flex-1 overflow-hidden flex flex-col p-6">
-          <div className="bg-white rounded-[32px] border border-pastel-border flex-1 flex flex-col overflow-hidden shadow-sm">
-            {/* Table Header */}
-            <div className="flex items-center px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black uppercase tracking-widest text-pastel-subtext">
-              <div className="w-12 text-center">STT</div>
-              <div className="flex-1 px-4">Danh sách khách hàng</div>
-              {months.map(m => (
-                <div key={m.value} className="w-32 text-center border-l border-pastel-border/50">{m.label}</div>
-              ))}
-              <div className="w-24 text-center border-l border-pastel-border/50">Thao tác</div>
-            </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {months.map(month => {
+                    const examEntry = skinAudits.find(e => e.customerId === customer.id && e.month === month.value && e.type === 'Khám');
+                    const checkEntry = skinAudits.find(e => e.customerId === customer.id && e.month === month.value && e.type === 'Kiểm tra');
 
-            {/* Table Body */}
-            <div className="flex-1 overflow-y-auto no-scrollbar">
-              {sortedCustomers.map((customer, idx) => {
-                return (
-                  <div key={customer.id} className="flex items-center px-6 py-4 border-b border-pastel-border/30 hover:bg-pastel-bg/20 transition-colors">
-                    <div className="w-12 text-center text-sm font-black text-pastel-subtext">{idx + 1}</div>
-                    <div className="flex-1 px-4">
-                      <div className="font-black text-slate-700">{customer.name}</div>
-                    </div>
-
-                    {months.map(month => {
-                      const examEntry = skinAudits.find(e => e.customerId === customer.id && e.month === month.value && e.type === 'Khám');
-                      const checkEntry = skinAudits.find(e => e.customerId === customer.id && e.month === month.value && e.type === 'Kiểm tra');
-
-                      return (
-                        <div key={month.value} className="w-32 flex flex-col items-center justify-center gap-2 border-l border-pastel-border/10">
+                    return (
+                      <div key={month.value} className="flex flex-col gap-2">
+                        <div className="text-[10px] font-black text-pastel-subtext text-center uppercase tracking-tighter">{month.label}</div>
+                        <div className="flex flex-col gap-1.5 min-h-[60px]">
                           {examEntry ? (
-                            <div className="flex flex-col items-center gap-1 group">
-                              <span className="text-[11px] font-black text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100">
-                                {examEntry.date}
-                              </span>
-                              <div className="flex items-center gap-1 mt-1">
-                                <button onClick={() => { setEditingId(examEntry.id); setEditDate(examEntry.date); }} className="p-1 bg-white border border-teal-200 rounded-md text-teal-500 shadow-sm hover:bg-teal-50"><Pencil className="w-2.5 h-2.5" /></button>
-                                <button onClick={() => handleDelete(examEntry.id)} className="p-1 bg-white border border-rose-200 rounded-md text-rose-500 shadow-sm hover:bg-rose-50"><Trash2 className="w-2.5 h-2.5" /></button>
+                            <div className="bg-teal-50 border border-teal-100 rounded-xl p-1.5 flex flex-col items-center gap-1 group">
+                              <span className="text-[11px] font-black text-teal-600">{examEntry.date}</span>
+                              <div className="flex gap-1">
+                                <button onClick={() => { setEditingId(examEntry.id); setEditDate(examEntry.date); }} className="p-1 hover:bg-white rounded text-teal-500"><Pencil className="w-3 h-3" /></button>
+                                <button onClick={() => handleDelete(examEntry.id)} className="p-1 hover:bg-white rounded text-rose-500"><Trash2 className="w-3 h-3" /></button>
                               </div>
                             </div>
                           ) : (
@@ -196,7 +231,7 @@ export default function SkinAuditModal({ customers, skinAudits, username, onUpda
                                 setPendingAudit({ customerId: customer.id, month: month.value, type: 'Khám' });
                                 setEditDate(getTodayFormatted().slice(0, 5));
                               }}
-                              className="text-[10px] font-black text-pastel-subtext px-2 py-1 rounded-lg border border-pastel-border hover:bg-teal-500 hover:text-white hover:border-teal-500 transition-all active:scale-95"
+                              className="w-full flex-1 border border-dashed border-teal-200 text-[10px] font-black text-teal-500 rounded-xl active:scale-95 transition-all py-2"
                             >
                               Khám
                             </button>
@@ -204,13 +239,11 @@ export default function SkinAuditModal({ customers, skinAudits, username, onUpda
 
                           {!examEntry && (
                             checkEntry ? (
-                              <div className="flex flex-col items-center gap-1 group">
-                                <span className="text-[11px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
-                                  {checkEntry.date}
-                                </span>
-                                <div className="flex items-center gap-1 mt-1">
-                                  <button onClick={() => { setEditingId(checkEntry.id); setEditDate(checkEntry.date); }} className="p-1 bg-white border border-amber-200 rounded-md text-amber-500 shadow-sm hover:bg-amber-50"><Pencil className="w-2.5 h-2.5" /></button>
-                                  <button onClick={() => handleDelete(checkEntry.id)} className="p-1 bg-white border border-rose-200 rounded-md text-rose-500 shadow-sm hover:bg-rose-50"><Trash2 className="w-2.5 h-2.5" /></button>
+                              <div className="bg-amber-50 border border-amber-100 rounded-xl p-1.5 flex flex-col items-center gap-1">
+                                <span className="text-[11px] font-black text-amber-600">{checkEntry.date}</span>
+                                <div className="flex gap-1">
+                                  <button onClick={() => { setEditingId(checkEntry.id); setEditDate(checkEntry.date); }} className="p-1 hover:bg-white rounded text-amber-500"><Pencil className="w-3 h-3" /></button>
+                                  <button onClick={() => handleDelete(checkEntry.id)} className="p-1 hover:bg-white rounded text-rose-500"><Trash2 className="w-3 h-3" /></button>
                                 </div>
                               </div>
                             ) : (
@@ -219,123 +252,109 @@ export default function SkinAuditModal({ customers, skinAudits, username, onUpda
                                   setPendingAudit({ customerId: customer.id, month: month.value, type: 'Kiểm tra' });
                                   setEditDate(getTodayFormatted().slice(0, 5));
                                 }}
-                                className="text-[10px] font-black text-pastel-subtext px-2 py-1 rounded-lg border border-dashed border-pastel-border hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all active:scale-95"
+                                className="w-full flex-1 border border-dotted border-amber-200 text-[10px] font-bold text-amber-500/70 rounded-xl active:scale-95 transition-all py-1.5"
                               >
-                                Kiểm tra
+                                Test
                               </button>
                             )
                           )}
                         </div>
-                      );
-                    })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {sortedCustomers.length === 0 && (
+            <div className="text-center py-20 text-slate-400 italic text-sm">Không tìm thấy kết quả</div>
+          )}
+        </div>
+      </div>
 
-                    <div className="w-24 border-l border-pastel-border/10 flex items-center justify-center gap-2">
-                       <button 
-                         onClick={() => setShowHistoryId(showHistoryId === customer.id ? null : customer.id)}
-                         className="p-2.5 bg-pastel-bg text-pastel-subtext rounded-2xl hover:bg-teal-50 hover:text-teal-500 transition-colors active:scale-90"
-                         title="Lịch sử"
-                       >
-                         <History className="w-5 h-5" />
-                       </button>
+      {/* Date Entry/Edit Modal */}
+      {(editingId || pendingAudit) && (
+        <div className="fixed inset-0 z-[1200] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white p-8 rounded-[40px] shadow-2xl w-full max-w-sm border-4 border-teal-500/20"
+          >
+            <h3 className="text-sm font-black text-slate-800 uppercase mb-4 text-center">
+              {pendingAudit ? `Ngày ${pendingAudit.type}` : 'Sửa ngày'}
+            </h3>
+            <input 
+              type="text"
+              value={editDate}
+              onChange={e => setEditDate(e.target.value)}
+              placeholder="dd.mm"
+              className="w-full px-4 py-4 bg-pastel-bg rounded-2xl text-center font-black text-2xl border-2 border-transparent focus:border-teal-500 outline-none transition-all mb-6 text-teal-600"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button onClick={() => { setEditingId(null); setPendingAudit(null); setEditDate(""); }} className="flex-1 py-3.5 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase active:scale-95">Huỷ</button>
+              <button 
+                onClick={() => {
+                  if (editingId) handleUpdateDate(editingId, editDate);
+                  else if (pendingAudit) {
+                    handleAction(pendingAudit.customerId, pendingAudit.month, pendingAudit.type, editDate);
+                    setPendingAudit(null);
+                    setEditDate("");
+                  }
+                }} 
+                className="flex-1 py-3.5 bg-teal-500 text-white rounded-2xl font-black text-xs uppercase shadow-xl shadow-teal-100 active:scale-95"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      <AnimatePresence>
+        {showHistoryId && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1200] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => setShowHistoryId(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-pastel-border flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-teal-50 text-teal-500 rounded-2xl"><History className="w-5 h-5" /></div>
+                  <h3 className="font-black text-slate-800">Lịch sử: {customers.find(c => c.id === showHistoryId)?.name}</h3>
+                </div>
+                <button onClick={() => setShowHistoryId(null)} className="p-2 hover:bg-rose-50 rounded-xl transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
+              </div>
+              <div className="p-6 max-h-[60vh] overflow-y-auto no-scrollbar space-y-3">
+                {[...skinAuditLogs].filter(e => e.customerId === showHistoryId).map(log => (
+                  <div key={log.id} className="p-4 bg-pastel-bg/50 rounded-2xl border border-pastel-border/50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={cn(
+                        "text-[9px] font-black px-2 py-0.5 rounded-full uppercase",
+                        log.action === 'create' ? "bg-emerald-500 text-white" : 
+                        log.action === 'update' ? "bg-indigo-500 text-white" : "bg-rose-500 text-white"
+                      )}>
+                        {log.action === 'create' ? 'Tạo' : log.action === 'update' ? 'Sửa' : 'Xóa'}
+                      </span>
+                      <span className="text-[10px] font-bold text-pastel-subtext">{new Date(log.timestamp).toLocaleString('vi-VN')}</span>
+                    </div>
+                    <div className="text-sm font-black text-slate-700">
+                      <span className={cn(log.type === 'Khám' ? "text-teal-600" : "text-amber-600")}>{log.type}</span> 
+                      {log.action !== 'delete' && <span> - Ngày: <span className="text-rose-500">{log.date}</span></span>}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Date Entry/Edit Modal */}
-        {(editingId || pendingAudit) && (
-          <div className="fixed inset-0 z-[1200] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-white p-8 rounded-[40px] shadow-2xl w-full max-w-sm border-4 border-teal-500/20"
-            >
-              <h3 className="text-sm font-black text-slate-800 uppercase mb-4 text-center">
-                {pendingAudit ? `Nhập ngày ${pendingAudit.type}` : 'Sửa ngày'}
-              </h3>
-              <input 
-                type="text"
-                value={editDate}
-                onChange={e => setEditDate(e.target.value)}
-                placeholder="dd.mm"
-                className="w-full px-4 py-4 bg-pastel-bg rounded-2xl text-center font-black text-2xl border-2 border-transparent focus:border-teal-500 outline-none transition-all mb-6 text-teal-600"
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => { setEditingId(null); setPendingAudit(null); setEditDate(""); }} 
-                  className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-sm active:scale-95 transition-all"
-                >
-                  Huỷ
-                </button>
-                <button 
-                  onClick={() => {
-                    if (editingId) {
-                      handleUpdateDate(editingId, editDate);
-                    } else if (pendingAudit) {
-                      handleAction(pendingAudit.customerId, pendingAudit.month, pendingAudit.type, editDate);
-                      setPendingAudit(null);
-                      setEditDate("");
-                    }
-                  }} 
-                  className="flex-1 py-4 bg-teal-500 text-white rounded-2xl font-black text-sm shadow-xl shadow-teal-100 active:scale-95 transition-all"
-                >
-                  Xác nhận
-                </button>
+                ))}
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
-
-        {/* History Modal */}
-        <AnimatePresence>
-          {showHistoryId && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[1200] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm"
-              onClick={() => setShowHistoryId(null)}
-            >
-              <motion.div 
-                initial={{ scale: 0.9, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.9, y: 20 }}
-                className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden border-4 border-teal-500/10"
-                onClick={e => e.stopPropagation()}
-              >
-                <div className="p-6 border-b border-pastel-border flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-teal-50 text-teal-500 rounded-2xl"><History className="w-5 h-5" /></div>
-                    <h3 className="font-black text-slate-800">Lịch sử: {customers.find(c => c.id === showHistoryId)?.name}</h3>
-                  </div>
-                  <button onClick={() => setShowHistoryId(null)} className="p-2 hover:bg-rose-50 rounded-xl transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
-                </div>
-                <div className="p-6 max-h-[60vh] overflow-y-auto no-scrollbar space-y-3">
-                  {[...skinAudits].filter(e => e.customerId === showHistoryId).reverse().map(e => (
-                    <div key={e.id} className="p-4 bg-pastel-bg/50 rounded-2xl border border-pastel-border/50">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full", e.type === 'Khám' ? "bg-teal-500 text-white" : "bg-amber-500 text-white")}>
-                          {e.type}
-                        </span>
-                        <span className="text-[10px] font-bold text-pastel-subtext">{new Date(e.createdAt).toLocaleString('vi-VN')}</span>
-                      </div>
-                      <div className="text-sm font-black text-slate-700">Ngày: <span className="text-teal-600">{e.date}</span></div>
-                      <div className="text-[10px] font-bold text-pastel-subtext mt-1 italic">Người thực hiện: {e.createdBy}</div>
-                    </div>
-                  ))}
-                  {skinAudits.filter(e => e.customerId === showHistoryId).length === 0 && (
-                    <div className="text-center py-10 text-pastel-subtext italic text-sm">Chưa có lịch sử</div>
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </div>
+      </AnimatePresence>
+    </motion.div>
   );
 }

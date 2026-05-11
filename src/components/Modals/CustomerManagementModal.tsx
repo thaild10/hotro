@@ -1,14 +1,16 @@
 import React, { useState, useMemo } from "react";
 import { X, Plus, Image as ImageIcon, Trash2, Pencil, ChevronLeft, ChevronRight, User } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Customer } from "../../types";
+import { Customer, ImageCompressionSettings } from "../../types";
 import { cn } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { uploadToFirebase } from "../../lib/imageUtils";
 
 interface CustomerManagementModalProps {
   customers: Customer[];
   onClose: () => void;
   onUpdateCustomers: (customers: Customer[]) => void;
+  compressionSettings: ImageCompressionSettings;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -16,10 +18,12 @@ const ITEMS_PER_PAGE = 10;
 export default function CustomerManagementModal({ 
   customers, 
   onClose, 
-  onUpdateCustomers 
+  onUpdateCustomers,
+  compressionSettings
 }: CustomerManagementModalProps) {
   const [name, setName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -30,14 +34,19 @@ export default function CustomerManagementModal({
     return customers.slice(start, start + ITEMS_PER_PAGE);
   }, [customers, currentPage]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setIsUploading(true);
+      try {
+        const url = await uploadToFirebase(file, 'customers', compressionSettings);
+        setImageUrl(url);
+      } catch (error) {
+        console.error("Upload fail:", error);
+        alert("Upload ảnh thất bại!");
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -68,6 +77,22 @@ export default function CustomerManagementModal({
     setEditingId(customer.id);
   };
 
+  const removeAvatar = () => {
+    setConfirmConfig({
+      message: "Bạn có chắc chắn muốn xóa ảnh đại diện?",
+      action: () => {
+        setImageUrl("");
+        if (editingId) {
+          const updated = customers.map(c => 
+            c.id === editingId ? { ...c, imageUrl: "" } : c
+          );
+          onUpdateCustomers(updated);
+        }
+        setConfirmConfig(null);
+      }
+    });
+  };
+
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
 
@@ -83,33 +108,44 @@ export default function CustomerManagementModal({
 
   return (
     <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+      initial={{ x: "100%" }}
+      animate={{ x: 0 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", damping: 30, stiffness: 300 }}
+      className="fixed inset-0 bg-pastel-bg z-[1000] flex flex-col md:max-w-[430px] md:mx-auto md:border-x md:border-slate-200"
     >
-      <motion.div 
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        className="bg-white w-full max-w-lg rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[90vh]"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="font-bold text-xl text-violet-500">Quản lý khách hàng</h3>
-          <button onClick={onClose} className="p-2 bg-pastel-bg rounded-full active:scale-95 transition-transform">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+      {/* Page Header */}
+      <div className="bg-white px-4 h-16 flex items-center gap-3 border-b border-pastel-border shrink-0">
+        <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl transition-colors active:scale-95 flex items-center gap-2">
+          <ChevronLeft className="w-6 h-6 text-slate-600" />
+          <span className="font-black text-slate-600 text-sm">Quay lại</span>
+        </button>
+        <div className="h-6 w-[1px] bg-slate-200 mx-1" />
+        <h3 className="font-black text-lg text-rose-500 uppercase tracking-tight">Khách hàng</h3>
+      </div>
 
+      <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-6">
         {/* Create Area */}
-        <div className="bg-pastel-bg p-4 rounded-3xl border border-pastel-border mb-6">
+        <div className="bg-white p-4 rounded-3xl border border-pastel-border shadow-sm">
           <div className="flex items-center gap-3">
             <div className="relative group">
               <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-12 h-12 rounded-xl bg-white border border-pastel-border flex items-center justify-center cursor-pointer overflow-hidden group-hover:border-violet-300 transition-colors"
+                onClick={() => !isUploading && fileInputRef.current?.click()}
+                className={cn(
+                  "w-14 h-14 rounded-2xl bg-slate-50 border-2 border-dashed border-pastel-border flex items-center justify-center cursor-pointer overflow-hidden hover:border-rose-300 transition-colors",
+                  isUploading && "opacity-50 cursor-wait"
+                )}
               >
                 {imageUrl ? (
-                  <img src={imageUrl} alt="preview" className="w-full h-full object-cover" />
+                  <div className="relative w-full h-full">
+                    <img src={imageUrl} alt="preview" className="w-full h-full object-cover" />
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); removeAvatar(); }}
+                      className="absolute top-0.5 right-0.5 p-0.5 bg-rose-500 text-white rounded-lg shadow-md hover:scale-110 transition-transform z-10"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 ) : (
                   <ImageIcon className="w-6 h-6 text-pastel-subtext" />
                 )}
@@ -122,147 +158,81 @@ export default function CustomerManagementModal({
                 accept="image/*"
               />
             </div>
-            <input 
-              type="text" 
-              value={!editingId ? name : ''}
-              onChange={(e) => {
-                if (!editingId) setName(e.target.value);
-              }}
-              disabled={!!editingId}
-              placeholder={editingId ? "Đang sửa khách hàng ở dưới..." : "Nhập tên khách..."}
-              className="flex-1 bg-white border border-pastel-border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-violet-300 disabled:bg-gray-100 disabled:opacity-50"
-            />
-            <button 
-              onClick={handleCreateOrUpdate}
-              disabled={!!editingId}
-              className={cn(
-                "bg-violet-500 text-white p-3 rounded-xl shadow-lg shadow-violet-100 active:scale-95 transition-transform",
-                !!editingId && "opacity-50 pointer-events-none"
+            <div className="flex-1 flex flex-col gap-2">
+              <input 
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nhập tên khách hàng..."
+                className="w-full bg-slate-50 border-none rounded-xl py-3 px-4 text-sm font-bold focus:ring-2 focus:ring-rose-200 outline-none"
+              />
+              <button 
+                onClick={handleCreateOrUpdate}
+                className={cn(
+                  "w-full py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95",
+                  editingId ? "bg-amber-500 shadow-amber-100 text-white" : "bg-rose-500 shadow-rose-100 text-white"
+                )}
+              >
+                {editingId ? "Cập nhật thông tin" : "Thêm khách hàng"}
+              </button>
+              {editingId && (
+                <button onClick={() => { setEditingId(null); setName(""); setImageUrl(""); }} className="text-[10px] font-black text-slate-400 uppercase text-center mt-1">Huỷ sửa</button>
               )}
-            >
-              <Plus className="w-5 h-5" />
-            </button>
+            </div>
           </div>
         </div>
 
         {/* List Area */}
-        <div className="flex-1 overflow-y-auto no-scrollbar space-y-3 pr-1">
-          {paginatedCustomers.map((customer, index) => (
-            <div key={customer.id} className="flex items-center gap-3 p-3 bg-white border border-pastel-border rounded-2xl">
-              <span className="text-xs font-bold text-pastel-subtext w-4 shrink-0">
-                {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-              </span>
-              
-              {editingId === customer.id ? (
-                <>
-                  <div className="relative group shrink-0">
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-10 h-10 rounded-lg bg-white border border-violet-300 flex items-center justify-center cursor-pointer overflow-hidden"
-                    >
-                      {imageUrl ? (
-                        <img src={imageUrl} alt="preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageIcon className="w-5 h-5 text-violet-500" />
-                      )}
-                    </div>
-                  </div>
-                  <input 
-                    type="text" 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateOrUpdate();
-                      if (e.key === 'Escape') { setEditingId(null); setName(""); setImageUrl(""); }
-                    }}
-                    autoFocus
-                    className="flex-1 bg-white border-b-2 border-violet-500 px-2 py-2 text-sm font-bold outline-none"
-                  />
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button 
-                      onClick={handleCreateOrUpdate}
-                      className="p-2 text-white bg-violet-500 rounded-lg active:scale-95"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => { setEditingId(null); setName(""); setImageUrl(""); }}
-                      className="p-2 text-slate-500 bg-slate-100 rounded-lg active:scale-95"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
+        <div className="space-y-3 pb-20">
+          <div className="flex items-center justify-between px-2">
+            <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Danh sách ({customers.length})</h4>
+            <div className="flex items-center gap-1">
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="p-1.5 rounded-lg bg-white border border-pastel-border disabled:opacity-30"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-[10px] font-black w-14 text-center">{currentPage} / {totalPages}</span>
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="p-1.5 rounded-lg bg-white border border-pastel-border disabled:opacity-30"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {paginatedCustomers.map(customer => (
+              <div key={customer.id} className="bg-white p-3 rounded-2xl border border-pastel-border flex items-center justify-between group animate-in slide-in-from-right-2 duration-300 shadow-sm">
+                <div className="flex items-center gap-3">
                   <div 
                     onClick={() => customer.imageUrl && setSelectedImageUrl(customer.imageUrl)}
-                    className="w-10 h-10 rounded-lg bg-pastel-bg overflow-hidden flex items-center justify-center shrink-0 cursor-pointer"
+                    className="w-10 h-10 rounded-xl overflow-hidden bg-slate-50 border border-pastel-border flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
                   >
                     {customer.imageUrl ? (
                       <img src={customer.imageUrl} alt={customer.name} className="w-full h-full object-cover" />
                     ) : (
-                      <User className="w-6 h-6 text-pastel-subtext/30" />
+                      <User className="w-5 h-5 text-slate-300" />
                     )}
                   </div>
-                  <span className="flex-1 font-bold text-sm truncate">{customer.name}</span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button 
-                      onClick={() => handleEdit(customer)}
-                      className="p-2 text-violet-500 bg-violet-50 rounded-lg active:scale-95"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(customer.id)}
-                      className="p-2 text-red-500 bg-red-50 rounded-lg active:scale-95"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
-          {customers.length === 0 && (
-            <div className="text-center py-10 italic text-pastel-subtext text-sm">Chưa có khách hàng nào</div>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <button 
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => prev - 1)}
-              className="p-2 bg-pastel-bg rounded-xl disabled:opacity-30 active:scale-95"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={cn(
-                    "w-8 h-8 rounded-lg text-xs font-black transition-colors",
-                    currentPage === i + 1 ? "bg-violet-500 text-white" : "bg-pastel-bg text-pastel-subtext"
-                  )}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-            <button 
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              className="p-2 bg-pastel-bg rounded-xl disabled:opacity-30 active:scale-95"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+                  <span className="font-bold text-slate-700">{customer.name}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => handleEdit(customer)} className="p-2 text-violet-500 hover:bg-violet-50 rounded-xl transition-colors"><Pencil className="w-5 h-5" /></button>
+                  <button onClick={() => handleDelete(customer.id)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"><Trash2 className="w-5 h-5" /></button>
+                </div>
+              </div>
+            ))}
+            {paginatedCustomers.length === 0 && (
+              <div className="text-center py-20 text-slate-400 italic text-sm">Chưa có khách hàng</div>
+            )}
           </div>
-        )}
-      </motion.div>
+        </div>
+      </div>
 
       {/* Image View Overlay */}
       <AnimatePresence>
@@ -271,13 +241,13 @@ export default function CustomerManagementModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-8"
+            className="fixed inset-0 z-[1100] bg-black/90 flex items-center justify-center p-8"
             onClick={() => setSelectedImageUrl(null)}
           >
             <button className="absolute top-6 right-6 p-3 bg-white/10 rounded-full text-white">
               <X className="w-8 h-8" />
             </button>
-            <img src={selectedImageUrl} alt="full" className="max-w-full max-h-full object-contain rounded-lg" />
+            <img src={selectedImageUrl} alt="full" className="max-w-full max-h-full object-contain rounded-xl shadow-2xl shadow-white/10" />
           </motion.div>
         )}
       </AnimatePresence>

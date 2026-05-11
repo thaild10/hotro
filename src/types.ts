@@ -62,6 +62,7 @@ export interface Product {
   brandId: string;
   categoryId: string;
   price?: number;
+  imageUrl?: string;
   details?: {
     importPrice?: number;
     sellingPrice?: number;
@@ -84,6 +85,22 @@ export interface SkinAuditEntry {
   createdAt: string;
 }
 
+export interface SkinAuditLog {
+  id: string;
+  customerId: string;
+  action: 'create' | 'update' | 'delete';
+  type: 'Khám' | 'Kiểm tra';
+  month: string;
+  date: string;
+  user: string;
+  timestamp: string;
+}
+
+export interface ImageCompressionSettings {
+  maxWidth: number;
+  quality: number;
+}
+
 export interface AppData {
   cards: KanbanCard[];
   tagsConfig: Record<number, Tag[]>;
@@ -93,6 +110,8 @@ export interface AppData {
   productCategories?: ProductCategory[];
   products?: Product[];
   skinAudits?: SkinAuditEntry[];
+  skinAuditLogs?: SkinAuditLog[];
+  compressionSettings?: ImageCompressionSettings;
 }
 
 export const TAB_NAMES: Record<number, string> = {
