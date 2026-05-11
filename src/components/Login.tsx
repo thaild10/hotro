@@ -29,8 +29,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       return;
     }
 
-    // Automatically append domain if missing
-    const loginEmail = username.includes('@') ? username : `${username.toLowerCase()}@app.local`;
+    // Automatically append domain if missing, trim and lowercase for robustness
+    const rawInput = username.trim().toLowerCase();
+    const loginEmail = rawInput.includes('@') ? rawInput : `${rawInput}@app.local`;
     
     setLoading(true);
     setError(null);
@@ -38,10 +39,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, loginEmail, password);
       // Use the username prefix as the display name
-      const displayName = userCredential.user.email?.split('@')[0] || username;
+      const displayName = userCredential.user.email?.split('@')[0] || rawInput.split('@')[0];
       onLoginSuccess(displayName);
     } catch (err: any) {
-      console.error(err);
+      console.error("Login error:", err);
       setError("Tên đăng nhập hoặc mật khẩu không đúng");
     } finally {
       setLoading(false);
