@@ -10,10 +10,11 @@ import {
   Clock,
   Notebook,
   X,
-  RotateCcw
+  RotateCcw,
+  Plus
 } from "lucide-react";
 import { cn, getTodayFormatted, getTimeFormatted } from "../lib/utils";
-import { KanbanCard, TAB_NAMES, Customer } from "../types";
+import { KanbanCard, TAB_NAMES, Customer, Product } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 
 // Helper for tag colors (similar to logic in HTML)
@@ -40,6 +41,7 @@ interface CardProps {
   key?: string | number;
   card: KanbanCard;
   customers?: Customer[];
+  products?: Product[];
   index: number;
   onEdit: () => void;
   onMove: (tabId: number) => void;
@@ -49,12 +51,14 @@ interface CardProps {
   onNoteEdit: () => void;
   onDoctorReply: () => void;
   onNotify: () => void;
+  onAddDo?: () => void;
   updateCard: (id: string, updates: Partial<KanbanCard>) => void;
 }
 
 export default function Card({ 
   card, 
   customers = [],
+  products = [],
   index, 
   onEdit, 
   onMove, 
@@ -64,6 +68,7 @@ export default function Card({
   onNoteEdit, 
   onDoctorReply, 
   onNotify,
+  onAddDo,
   updateCard
 }: CardProps) {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
@@ -214,6 +219,35 @@ export default function Card({
             </div>
           </div>
         )}
+
+        {card.products && card.products.length > 0 && (
+          <div className="mt-4 bg-slate-50 border border-pastel-border p-3 rounded-2xl flex flex-col gap-2">
+            {/* Dò group */}
+            {card.products.filter(p => p.tag === 'Dò').length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-black text-amber-500 uppercase tracking-wider">Dò:</span>
+                <div className="flex flex-wrap gap-1">
+                  {card.products.filter(p => p.tag === 'Dò').map(p => {
+                    const prodName = products.find(prod => prod.id === p.productId)?.name || 'Unknown';
+                    return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{prodName}</span>;
+                  })}
+                </div>
+              </div>
+            )}
+            {/* Dò xong group */}
+            {card.products.filter(p => p.tag === 'Dò xong').length > 0 && (
+              <div className="flex flex-col gap-1 mt-1">
+                <span className="text-xs font-black text-emerald-500 uppercase tracking-wider">Dò xong:</span>
+                <div className="flex flex-wrap gap-1">
+                  {card.products.filter(p => p.tag === 'Dò xong').map(p => {
+                    const prodName = products.find(prod => prod.id === p.productId)?.name || 'Unknown';
+                    return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{prodName}</span>;
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
@@ -314,6 +348,18 @@ export default function Card({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Add/Dò Button for Tab 3 */}
+      {card.tabId === 3 && !isCollapsed && (
+        <div className="mt-4 flex justify-center border-t border-pastel-border/60 pt-4">
+          <button 
+            onClick={onAddDo}
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 font-bold text-xs active:scale-95 transition-all shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Add/Dò
+          </button>
         </div>
       )}
 

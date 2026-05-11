@@ -30,38 +30,30 @@ export default function ProductManagementModal({
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="bg-white rounded-[32px] w-full max-w-4xl h-[90vh] sm:h-[700px] flex flex-col shadow-2xl overflow-hidden"
       >
-        <div className="flex items-center justify-between p-6 border-b border-pastel-border bg-pastel-bg/50">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-500">
-              <Package className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-800">Quản lý Sản phẩm</h2>
-              <div className="flex items-center gap-2 mt-2">
-                <button
-                  onClick={() => setActiveTab(0)}
-                  className={`text-sm font-bold px-4 py-1.5 rounded-full transition-colors ${activeTab === 0 ? 'bg-amber-500 text-white' : 'bg-white text-pastel-subtext border border-pastel-border'}`}
-                >
-                  1. Quản lý hãng
-                </button>
-                <button
-                  onClick={() => setActiveTab(1)}
-                  className={`text-sm font-bold px-4 py-1.5 rounded-full transition-colors ${activeTab === 1 ? 'bg-amber-500 text-white' : 'bg-white text-pastel-subtext border border-pastel-border'}`}
-                >
-                  2. Quản lý loại
-                </button>
-                <button
-                  onClick={() => setActiveTab(2)}
-                  className={`text-sm font-bold px-4 py-1.5 rounded-full transition-colors ${activeTab === 2 ? 'bg-amber-500 text-white' : 'bg-white text-pastel-subtext border border-pastel-border'}`}
-                >
-                  3. Quản lý sản phẩm
-                </button>
-              </div>
-            </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 border-b border-pastel-border bg-pastel-bg/50 gap-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setActiveTab(0)}
+              className={`text-sm font-bold px-4 py-1.5 rounded-full transition-colors ${activeTab === 0 ? 'bg-amber-500 text-white' : 'bg-white text-pastel-subtext border border-pastel-border'}`}
+            >
+              1. Quản lý hãng
+            </button>
+            <button
+              onClick={() => setActiveTab(1)}
+              className={`text-sm font-bold px-4 py-1.5 rounded-full transition-colors ${activeTab === 1 ? 'bg-amber-500 text-white' : 'bg-white text-pastel-subtext border border-pastel-border'}`}
+            >
+              2. Quản lý loại
+            </button>
+            <button
+              onClick={() => setActiveTab(2)}
+              className={`text-sm font-bold px-4 py-1.5 rounded-full transition-colors ${activeTab === 2 ? 'bg-amber-500 text-white' : 'bg-white text-pastel-subtext border border-pastel-border'}`}
+            >
+              3. Quản lý sản phẩm
+            </button>
           </div>
           <button 
             onClick={onClose}
-            className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-pastel-subtext hover:bg-pastel-bg hover:text-slate-700 transition-colors shadow-sm"
+            className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-pastel-subtext hover:bg-pastel-bg hover:text-slate-700 transition-colors shadow-sm ml-auto absolute top-4 right-4 sm:static m-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -72,10 +64,10 @@ export default function ProductManagementModal({
             <BrandTab brands={brands} onUpdateBrands={onUpdateBrands} setConfirmConfig={setConfirmConfig} />
           )}
           {activeTab === 1 && (
-            <div className="flex items-center justify-center h-full text-pastel-subtext italic">Chưa triển khai (Yêu cầu chỉ có Quản lý hãng)</div>
+            <CategoryTab categories={categories} onUpdateCategories={onUpdateCategories} setConfirmConfig={setConfirmConfig} />
           )}
           {activeTab === 2 && (
-            <div className="flex items-center justify-center h-full text-pastel-subtext italic">Chưa triển khai (Yêu cầu chỉ có Quản lý hãng)</div>
+            <ProductTab products={products} brands={brands} categories={categories} onUpdateProducts={onUpdateProducts} setConfirmConfig={setConfirmConfig} />
           )}
         </div>
       </motion.div>
@@ -136,28 +128,28 @@ function BrandTab({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Top bar */}
-      <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-pastel-border">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-pastel-border">
         <div className="flex items-center gap-2">
           <button 
             onClick={() => setSortAsc(!sortAsc)}
-            className="flex items-center gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none"
+            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none w-full sm:w-auto"
           >
             {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
             {sortAsc ? "Từ A - Z" : "Từ Z - A"}
           </button>
         </div>
-        <div className="flex items-center gap-3 flex-1 max-w-md">
+        <div className="flex items-center gap-3 flex-1 w-full sm:max-w-md">
           <input 
             type="text"
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
             placeholder="Nhập tên hãng mới..."
-            className="flex-1 bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors"
+            className="flex-1 min-w-0 bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors"
           />
           <button 
             onClick={handleCreate}
-            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform"
+            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform whitespace-nowrap"
           >
             Tạo
           </button>
@@ -232,6 +224,352 @@ function BrandTab({
           {sortedBrands.length === 0 && (
             <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
               Chưa có hãng nào
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryTab({ 
+  categories, 
+  onUpdateCategories, 
+  setConfirmConfig 
+}: { 
+  categories: ProductCategory[], 
+  onUpdateCategories: (c: ProductCategory[]) => void, 
+  setConfirmConfig: any 
+}) {
+  const [sortAsc, setSortAsc] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  const handleCreate = () => {
+    if (!newName.trim()) return;
+    const newCategory: ProductCategory = { id: `cat-${Date.now()}`, name: newName.trim() };
+    onUpdateCategories([...categories, newCategory]);
+    setNewName("");
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (!editName.trim()) return;
+    onUpdateCategories(categories.map(c => c.id === id ? { ...c, name: editName.trim() } : c));
+    setEditingId(null);
+  };
+
+  const handleDelete = (id: string) => {
+    setConfirmConfig({
+      message: "Bạn có chắc chắn muốn xóa loại sản phẩm này?",
+      action: () => {
+        onUpdateCategories(categories.filter(c => c.id !== id));
+        setConfirmConfig(null);
+      }
+    });
+  };
+
+  const sortedCategories = [...categories].sort((a, b) => {
+    return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+  });
+
+  return (
+    <div className="flex flex-col h-full space-y-4">
+      {/* Top bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-pastel-border">
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setSortAsc(!sortAsc)}
+            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none w-full sm:w-auto"
+          >
+            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
+            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
+          </button>
+        </div>
+        <div className="flex items-center gap-3 flex-1 w-full sm:max-w-md">
+          <input 
+            type="text"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            placeholder="Nhập tên loại sản phẩm mới..."
+            className="flex-1 min-w-0 bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors"
+          />
+          <button 
+            onClick={handleCreate}
+            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform whitespace-nowrap"
+          >
+            Tạo
+          </button>
+        </div>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 border border-pastel-border bg-white rounded-3xl overflow-hidden flex flex-col">
+        <div className="flex px-4 py-3 bg-pastel-bg border-b border-pastel-border text-xs font-black text-pastel-subtext uppercase">
+          <div className="w-12 text-center">STT</div>
+          <div className="flex-1">Tên loại</div>
+          <div className="w-24 text-right">Thao tác</div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          {sortedCategories.map((category, idx) => (
+            <div key={category.id} className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors">
+              <div className="w-12 text-center text-sm font-bold text-pastel-subtext">
+                {idx + 1}
+              </div>
+              <div className="flex-1 font-bold text-sm text-slate-700">
+                {editingId === category.id ? (
+                  <input 
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveEdit(category.id);
+                      if (e.key === 'Escape') setEditingId(null);
+                    }}
+                    autoFocus
+                    className="w-full bg-white border-b-2 border-amber-500 px-2 py-1 outline-none"
+                  />
+                ) : (
+                  <span className="uppercase">{category.name}</span>
+                )}
+              </div>
+              <div className="w-24 flex items-center justify-end gap-1">
+                {editingId === category.id ? (
+                  <>
+                    <button 
+                      onClick={() => handleSaveEdit(category.id)}
+                      className="p-2 text-white bg-amber-500 rounded-lg active:scale-95"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => setEditingId(null)}
+                      className="p-2 text-slate-500 bg-slate-100 rounded-lg active:scale-95"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => { setEditingId(category.id); setEditName(category.name); }}
+                      className="p-2 text-amber-500 bg-amber-50 rounded-lg active:scale-95"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(category.id)}
+                      className="p-2 text-red-500 bg-red-50 rounded-lg active:scale-95"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {sortedCategories.length === 0 && (
+            <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
+              Chưa có loại sản phẩm nào
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductTab({ 
+  products, 
+  brands,
+  categories,
+  onUpdateProducts, 
+  setConfirmConfig 
+}: { 
+  products: Product[],
+  brands: Brand[],
+  categories: ProductCategory[],
+  onUpdateProducts: (p: Product[]) => void, 
+  setConfirmConfig: any 
+}) {
+  const [sortAsc, setSortAsc] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  const handleCreate = () => {
+    if (!newName.trim() || !selectedBrand || !selectedCategory) {
+      alert("Vui lòng nhập tên sản phẩm, chọn hãng và chọn loại.");
+      return;
+    }
+    const newProduct: Product = { 
+      id: `prod-${Date.now()}`, 
+      name: newName.trim(),
+      brandId: selectedBrand,
+      categoryId: selectedCategory
+    };
+    onUpdateProducts([...products, newProduct]);
+    setNewName("");
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (!editName.trim()) return;
+    onUpdateProducts(products.map(p => p.id === id ? { ...p, name: editName.trim() } : p));
+    setEditingId(null);
+  };
+
+  const handleDelete = (id: string) => {
+    setConfirmConfig({
+      message: "Bạn có chắc chắn muốn xóa sản phẩm này?",
+      action: () => {
+        onUpdateProducts(products.filter(p => p.id !== id));
+        setConfirmConfig(null);
+      }
+    });
+  };
+
+  const sortedProducts = [...products].sort((a, b) => {
+    return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+  });
+
+  return (
+    <div className="flex flex-col h-full space-y-4">
+      {/* Top bar */}
+      <div className="flex flex-col gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <input 
+            type="text"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            placeholder="Nhập tên sản phẩm mới..."
+            className="flex-1 bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors min-w-0"
+          />
+          <div className="flex gap-2 min-w-0">
+            <select
+              value={selectedBrand}
+              onChange={e => setSelectedBrand(e.target.value)}
+              className="flex-1 sm:flex-none sm:w-[120px] bg-pastel-bg rounded-xl px-2 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
+            >
+              <option value="">- Chọn hãng -</option>
+              {brands.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <select
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              className="flex-1 sm:flex-none sm:w-[120px] bg-pastel-bg rounded-xl px-2 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
+            >
+              <option value="">- Chọn loại -</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <button 
+            onClick={handleCreate}
+            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform"
+          >
+            Tạo
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-2 mt-2">
+          <button 
+            onClick={() => setSortAsc(!sortAsc)}
+            className="flex items-center gap-2 px-4 py-2 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none text-sm w-full sm:w-auto justify-center"
+          >
+            {sortAsc ? <ArrowDownAZ className="w-4 h-4 text-amber-500" /> : <ArrowUpZA className="w-4 h-4 text-amber-500" />}
+            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
+          </button>
+        </div>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 border border-pastel-border bg-white rounded-3xl overflow-hidden flex flex-col">
+        <div className="flex px-4 py-3 bg-pastel-bg border-b border-pastel-border text-xs font-black text-pastel-subtext uppercase">
+          <div className="w-12 text-center">STT</div>
+          <div className="flex-1">Tên sản phẩm</div>
+          <div className="w-32">Hãng</div>
+          <div className="w-32">Loại</div>
+          <div className="w-24 text-right">Thao tác</div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          {sortedProducts.map((product, idx) => {
+            const brand = brands.find(b => b.id === product.brandId);
+            const category = categories.find(c => c.id === product.categoryId);
+            return (
+              <div key={product.id} className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors">
+                <div className="w-12 text-center text-sm font-bold text-pastel-subtext">
+                  {idx + 1}
+                </div>
+                <div className="flex-1 font-bold text-sm text-slate-700 pr-2">
+                  {editingId === product.id ? (
+                    <input 
+                      type="text"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleSaveEdit(product.id);
+                        if (e.key === 'Escape') setEditingId(null);
+                      }}
+                      autoFocus
+                      className="w-full bg-white border-b-2 border-amber-500 px-2 py-1 outline-none"
+                    />
+                  ) : (
+                    <span className="uppercase">{product.name}</span>
+                  )}
+                </div>
+                <div className="w-32 text-xs font-bold text-slate-500 truncate pr-2">
+                  {brand?.name || '-'}
+                </div>
+                <div className="w-32 text-xs font-bold text-slate-500 truncate pr-2">
+                  {category?.name || '-'}
+                </div>
+                <div className="w-24 flex items-center justify-end gap-1">
+                  {editingId === product.id ? (
+                    <>
+                      <button 
+                        onClick={() => handleSaveEdit(product.id)}
+                        className="p-2 text-white bg-amber-500 rounded-lg active:scale-95"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setEditingId(null)}
+                        className="p-2 text-slate-500 bg-slate-100 rounded-lg active:scale-95"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => { setEditingId(product.id); setEditName(product.name); }}
+                        className="p-2 text-amber-500 bg-amber-50 rounded-lg active:scale-95"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(product.id)}
+                        className="p-2 text-red-500 bg-red-50 rounded-lg active:scale-95"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {sortedProducts.length === 0 && (
+            <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
+              Chưa có sản phẩm nào
             </div>
           )}
         </div>

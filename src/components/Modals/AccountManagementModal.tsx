@@ -3,6 +3,9 @@ import { User, Shield, Users, Pencil, Trash2, Plus, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserAccount } from "../../types";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { initializeApp } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import firebaseConfig from "../../../firebase-applet-config.json";
 
 interface AccountManagementModalProps {
   accounts: UserAccount[];
@@ -13,36 +16,61 @@ interface AccountManagementModalProps {
 export default function AccountManagementModal({ accounts, onUpdateAccounts, onClose }: AccountManagementModalProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<"Admin" | "Nhân viên">("Nhân viên");
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleCreateOrUpdate = () => {
+  const handleCreateOrUpdate = async () => {
     if (!username.trim()) return;
     
     if (editingId) {
       onUpdateAccounts(accounts.map(a => a.id === editingId ? { ...a, username, role } : a));
       setEditingId(null);
+      setUsername("");
+      setPassword("");
+      setRole("Nhân viên");
     } else {
-      const newAccount: UserAccount = {
-        id: `acc-${Date.now()}`,
-        username,
-        role
-      };
-      onUpdateAccounts([newAccount, ...accounts]);
+      if (!password.trim() || password.length < 6) {
+        alert("Vui lòng nhập mật khẩu hợp lệ (ít nhất 6 ký tự) để tạo tài khoản!");
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+        const secondaryAuth = getAuth(secondaryApp);
+        
+        await createUserWithEmailAndPassword(secondaryAuth, username.trim(), password);
+        
+        const newAccount: UserAccount = {
+          id: `acc-${Date.now()}`,
+          username: username.trim(),
+          role
+        };
+        onUpdateAccounts([newAccount, ...accounts]);
+        setUsername("");
+        setPassword("");
+        setRole("Nhân viên");
+      } catch (error: any) {
+        console.error("Error creating user:", error);
+        alert(`Lỗi tạo tài khoản: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
     }
-    setUsername("");
-    setRole("Nhân viên");
   };
 
   const handleEdit = (acc: UserAccount) => {
     setEditingId(acc.id);
     setUsername(acc.username);
     setRole(acc.role);
+    setPassword(""); // Not updating password here for simplicity
   };
 
   const handleDelete = (id: string) => {
     setConfirmConfig({
-      message: "Xóa thành viên này?",
+      message: "Xóa thành viên này khỏi danh sách? (Sẽ không xoá khỏi Firebase Auth)",
       action: () => {
         onUpdateAccounts(accounts.filter(a => a.id !== id));
         setConfirmConfig(null);
@@ -65,7 +93,7 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-800">Quản lý Tài khoản</h2>
-              <p className="text-sm font-bold text-pastel-subtext mt-1">Phân quyền thành viên</p>
+              <p className="text-sm font-bold text-pastel-subtext mt-1">Phân quyền thành viên & Tạo tài khoản mới</p>
             </div>
           </div>
           <button 
@@ -78,36 +106,52 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col">
           {/* Form */}
-          <div className="bg-pastel-bg p-4 rounded-3xl border border-pastel-border flex gap-3">
-            <input 
-              type="text" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Tên truy cập..."
-              className="flex-1 bg-white border border-pastel-border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-300"
-            />
-            <select 
-              value={role}
-              onChange={(e) => setRole(e.target.value as any)}
-              className="bg-white border border-pastel-border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-300"
-            >
-              <option value="Nhân viên">Nhân viên</option>
-              <option value="Admin">Admin</option>
-            </select>
-            <button 
-              onClick={handleCreateOrUpdate}
-              className="bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-transform"
-            >
-              {editingId ? "Sửa" : "Thêm"}
-            </button>
-            {editingId && (
-              <button 
-                onClick={() => { setEditingId(null); setUsername(""); setRole("Nhân viên"); }}
-                className="bg-slate-200 text-slate-600 px-4 py-3 rounded-xl font-bold active:scale-95 transition-transform"
+          <div className="bg-pastel-bg p-4 rounded-3xl border border-pastel-border flex flex-col gap-3">
+            <div className="flex gap-3">
+              <input 
+                type="text" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Email đăng nhập..."
+                className="flex-1 bg-white border border-pastel-border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-300"
+              />
+              {!editingId && (
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mật khẩu..."
+                  className="flex-1 bg-white border border-pastel-border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-300"
+                />
+              )}
+            </div>
+            <div className="flex gap-3 justify-between items-center">
+              <select 
+                value={role}
+                onChange={(e) => setRole(e.target.value as any)}
+                className="bg-white border border-pastel-border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-300 min-w-[150px]"
               >
-                Hủy
-              </button>
-            )}
+                <option value="Nhân viên">Nhân viên</option>
+                <option value="Admin">Admin</option>
+              </select>
+              <div className="flex gap-2">
+                {editingId && (
+                  <button 
+                    onClick={() => { setEditingId(null); setUsername(""); setPassword(""); setRole("Nhân viên"); }}
+                    className="bg-slate-200 text-slate-600 px-4 py-3 rounded-xl font-bold active:scale-95 transition-transform"
+                  >
+                    Hủy
+                  </button>
+                )}
+                <button 
+                  onClick={handleCreateOrUpdate}
+                  disabled={loading}
+                  className="bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-transform disabled:opacity-50"
+                >
+                  {loading ? "Đang tạo..." : (editingId ? "Sửa" : "Tạo Tài khoản")}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* List */}

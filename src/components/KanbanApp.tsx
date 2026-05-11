@@ -44,6 +44,7 @@ import CardHistoryModal from "./Modals/CardHistoryModal";
 import TagSelectionModal from "./Modals/TagSelectionModal";
 import NoteEditModal from "./Modals/NoteEditModal";
 import DoctorReplyModal from "./Modals/DoctorReplyModal";
+import AddDoModal from "./Modals/AddDoModal";
 import { ConfirmDialog } from "./Modals/ConfirmDialog";
 
 interface KanbanAppProps {
@@ -72,6 +73,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const [historyCardId, setHistoryCardId] = useState<string | null>(null);
   const [noteEditCardId, setNoteEditCardId] = useState<string | null>(null);
   const [doctorReplyCardId, setDoctorReplyCardId] = useState<string | null>(null);
+  const [addDoCardId, setAddDoCardId] = useState<string | null>(null);
   const [showTagManagement, setShowTagManagement] = useState(false);
   const [showCustomerManagement, setShowCustomerManagement] = useState(false);
   const [showAccountManagement, setShowAccountManagement] = useState(false);
@@ -435,6 +437,14 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                 )}
               >
                 {name}
+                {tabId === 0 && (
+                  <span className={cn(
+                    "ml-1.5 flex items-center justify-center text-xs px-2 py-0.5 rounded-full font-black",
+                    isActive ? "bg-rose-100 text-rose-500" : "bg-pastel-bg text-pastel-subtext"
+                  )}>
+                    {cards.filter(c => c.tabId === 0).length}
+                  </span>
+                )}
                 {isActive && (
                   <div className="absolute -bottom-1 left-1/4 right-1/4 h-1 bg-rose-400 rounded-full" />
                 )}
@@ -452,6 +462,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
               key={card.id}
               card={card}
               customers={customers}
+              products={products}
               index={index}
               onEdit={() => setEditingCardId(card.id)}
               onMove={(tid) => moveCard(card.id, tid)}
@@ -463,6 +474,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
               onNotify={() => {
                 confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
               }}
+              onAddDo={() => setAddDoCardId(card.id)}
               updateCard={updateCard}
             />
           ))
@@ -593,6 +605,19 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           onUpdateCategories={setProductCategories}
           onUpdateProducts={setProducts}
           onClose={() => setShowProductManagement(false)}
+        />
+      )}
+
+      {addDoCardId && (
+        <AddDoModal
+          initialProducts={cards.find(c => c.id === addDoCardId)?.products || []}
+          availableProducts={products}
+          availableBrands={brands}
+          onSave={(updatedProducts) => {
+            updateCard(addDoCardId, { products: updatedProducts });
+            setAddDoCardId(null);
+          }}
+          onClose={() => setAddDoCardId(null)}
         />
       )}
 

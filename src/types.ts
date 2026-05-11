@@ -10,6 +10,11 @@ export interface Tag {
   color?: string;
 }
 
+export interface CardProduct {
+  productId: string;
+  tag: 'Dò' | 'Dò xong';
+}
+
 export interface KanbanCard {
   id: string;
   tabId: number;
@@ -26,6 +31,7 @@ export interface KanbanCard {
   notifiedTime?: string;
   tags: string[];
   logs: string[];
+  products?: CardProduct[];
 }
 
 export interface Customer {
