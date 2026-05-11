@@ -41,7 +41,7 @@ export const compressImage = (file: File, settings: CompressionSettings): Promis
               reject(new Error('Canvas toBlob returned null'));
             }
           },
-          'image/webp',
+          'image/jpeg',
           settings.quality / 100
         );
       };
@@ -61,8 +61,19 @@ export const uploadToFirebase = async (
     blob = await compressImage(file, settings);
   }
   
-  const filename = `${Date.now()}_${file.name}`;
-  const storageRef = ref(storage, `${folder}/${filename}`);
-  await uploadBytes(storageRef, blob);
-  return getDownloadURL(storageRef);
+  try {
+    const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    const storageRef = ref(storage, `${folder}/${filename}`);
+    console.log(`Uploading to ${folder}/${filename}...`);
+    await uploadBytes(storageRef, blob);
+    const url = await getDownloadURL(storageRef);
+    console.log(`Upload successful: ${url}`);
+    return url;
+  } catch (error) {
+    console.error("Firebase Storage Error:", error);
+    if (error instanceof Error) {
+      throw new Error(`Lỗi upload: ${error.message}`);
+    }
+    throw error;
+  }
 };

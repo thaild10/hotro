@@ -13,6 +13,9 @@ export interface Tag {
 export interface CardProduct {
   productId: string;
   tag: 'Dò' | 'Dò xong';
+  date?: string;
+  time?: string;
+  updatedAt?: number;
 }
 
 export interface KanbanCard {

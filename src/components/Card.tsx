@@ -223,34 +223,52 @@ export default function Card({
         )}
 
         {card.products && card.products.length > 0 && (
-          <div className="mt-4 bg-slate-50 border border-pastel-border p-3 rounded-2xl flex flex-col gap-2">
+          <div className="mt-4 bg-slate-50 border border-pastel-border p-3 rounded-2xl flex flex-col gap-3">
             {/* Dò group */}
             {card.products.filter(p => p.tag === 'Dò').length > 0 && (
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-black text-amber-500 uppercase tracking-wider">Dò:</span>
-                <div className="flex flex-wrap gap-1">
-                  {card.products.filter(p => p.tag === 'Dò').map(p => {
-                    const product = products.find(prod => prod.id === p.productId);
-                    const prodName = product?.name || 'Unknown';
-                    const brandName = product?.brandId ? brands.find(b => b.id === product.brandId)?.name : '';
-                    const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
-                    return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{displayName}</span>;
-                  })}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider ml-1">Đang Dò:</span>
+                <div className="flex flex-col gap-1">
+                  {card.products
+                    .filter(p => p.tag === 'Dò')
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    .map((p, idx) => {
+                      const product = products.find(prod => prod.id === p.productId);
+                      const prodName = product?.name || 'Unknown';
+                      const brandName = product?.brandId ? brands.find(b => b.id === product.brandId)?.name : '';
+                      const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
+                      const dateLabel = p.date ? ` - ${p.date}` : '';
+                      return (
+                        <div key={p.productId} className="px-3 py-2 bg-white border border-pastel-border/50 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2">
+                          <span className="w-5 h-5 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg text-[10px]">{idx + 1}</span>
+                          <span className="flex-1 truncate">{displayName}{dateLabel}</span>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             )}
             {/* Dò xong group */}
             {card.products.filter(p => p.tag === 'Dò xong').length > 0 && (
-              <div className="flex flex-col gap-1 mt-1">
-                <span className="text-xs font-black text-emerald-500 uppercase tracking-wider">Dò xong:</span>
-                <div className="flex flex-wrap gap-1">
-                  {card.products.filter(p => p.tag === 'Dò xong').map(p => {
-                    const product = products.find(prod => prod.id === p.productId);
-                    const prodName = product?.name || 'Unknown';
-                    const brandName = product?.brandId ? brands.find(b => b.id === product.brandId)?.name : '';
-                    const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
-                    return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{displayName}</span>;
-                  })}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-wider ml-1">Dò xong:</span>
+                <div className="flex flex-col gap-1">
+                  {card.products
+                    .filter(p => p.tag === 'Dò xong')
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    .map((p, idx) => {
+                      const product = products.find(prod => prod.id === p.productId);
+                      const prodName = product?.name || 'Unknown';
+                      const brandName = product?.brandId ? brands.find(b => b.id === product.brandId)?.name : '';
+                      const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
+                      const dateLabel = p.date ? ` - ${p.date}` : '';
+                      return (
+                        <div key={p.productId} className="px-3 py-2 bg-white border border-pastel-border/50 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2">
+                          <span className="w-5 h-5 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg text-[10px]">{idx + 1}</span>
+                          <span className="flex-1 truncate">{displayName}{dateLabel}</span>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             )}

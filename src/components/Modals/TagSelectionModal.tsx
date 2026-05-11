@@ -1,9 +1,10 @@
 import React from "react";
-import { X, Tag as TagIcon, ChevronLeft, Check, Clock } from "lucide-react";
+import { X, Tag as TagIcon } from "lucide-react";
 import { KanbanCard, Tag } from "../../types";
 import { motion } from "motion/react";
 import { cn } from "../../lib/utils";
 
+// Helper for tag colors (duplicate for standalone usage or export if possible)
 const TAG_COLOR_PALETTE = [
   { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
   { bg: 'bg-violet-50', text: 'text-violet-500', border: 'border-violet-200' },
@@ -12,6 +13,7 @@ const TAG_COLOR_PALETTE = [
   { bg: 'bg-fuchsia-50',text: 'text-fuchsia-500',border: 'border-fuchsia-200'},
   { bg: 'bg-sky-50',    text: 'text-sky-500',    border: 'border-sky-200'    },
   { bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-200' },
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
 ];
 
 function getTagColors(tagText: string) {
@@ -30,15 +32,18 @@ interface TagSelectionModalProps {
 export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateCard }: TagSelectionModalProps) {
   const availTags = tagsConfig[card.tabId] || [];
   const [scheduleTime, setScheduleTime] = React.useState("");
-  const [isScheduling, setIsScheduling] = React.useState(false);
+  const showTimeInput = React.useRef(false);
   
   const toggleTag = (tagText: string) => {
+    // Single select for Tab 5 (Spa)
     if (card.tabId === 5) {
       if (card.tags.includes(tagText)) {
         onUpdateCard({ tags: [] });
       } else {
+        // Special logic for "Xếp lịch"
         if (tagText === "Xếp lịch") {
-          setIsScheduling(true);
+          showTimeInput.current = true;
+          // We'll handle the actual update after time selection
           return;
         }
         onUpdateCard({ tags: [tagText] });
@@ -46,6 +51,7 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateC
       return;
     }
 
+    // Default multi-select
     if (card.tags.includes(tagText)) {
       onUpdateCard({ tags: card.tags.filter(t => t !== tagText) });
     } else {
@@ -56,6 +62,7 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateC
   const handleScheduleConfirm = () => {
     if (!scheduleTime.trim()) return;
     const scheduleStr = `🔔 Hẹn: ${scheduleTime}`;
+    // Update note automatically as requested
     const newNote = card.note ? `${card.note}\n${scheduleStr}` : scheduleStr;
     onUpdateCard({ 
       tags: ["Xếp lịch"],
@@ -65,80 +72,72 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateC
   };
 
   return (
-    <motion.div 
-      initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-      transition={{ type: "spring", damping: 30, stiffness: 300 }}
-      className="fixed inset-0 bg-pastel-bg z-[1000] flex flex-col md:max-w-[430px] md:mx-auto md:border-x md:border-slate-200"
-    >
-      <div className="bg-white px-4 h-16 flex items-center gap-3 border-b border-pastel-border shrink-0">
-        <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-colors active:scale-95">
-          <ChevronLeft className="w-6 h-6 text-slate-600" />
-          <span className="font-black text-slate-600 text-sm">Quay lại</span>
-        </button>
-        <div className="h-6 w-[1px] bg-slate-200 mx-1" />
-        <h3 className="font-black text-lg text-violet-500 uppercase tracking-tight">Gán Thẻ</h3>
-      </div>
-
-      <div className="flex-1 overflow-y-auto no-scrollbar p-6 bg-slate-50">
-        <div className="bg-white p-6 rounded-[40px] border border-pastel-border shadow-sm space-y-6">
-          <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
-              <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-500">
-                <TagIcon className="w-5 h-5 fill-current" />
-              </div>
-              <div>
-                <h4 className="font-black text-slate-800 text-base line-clamp-1">{card.name}</h4>
-                <p className="text-[10px] font-black text-pastel-subtext uppercase tracking-widest">Chọn thẻ trạng thái phù hợp</p>
-              </div>
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px]">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
+      >
+        <div className="flex items-center gap-3 mb-5 border-b pb-3 border-pastel-border">
+          <div className="w-10 h-10 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-500">
+            <TagIcon className="w-5 h-5 fill-current" />
           </div>
-
-          <div className="grid grid-cols-2 gap-3 pb-4">
-            {availTags.length > 0 ? availTags.map(tag => {
-              const colors = getTagColors(tag.text);
-              const isActive = card.tags.includes(tag.text);
-              return (
-                <button 
-                  key={tag.text}
-                  onClick={() => toggleTag(tag.text)}
-                  className={cn(
-                    "py-3.5 px-3 rounded-2xl text-[11px] font-black border transition-all active:scale-95 flex items-center justify-center gap-2",
-                    isActive ? cn(colors.bg, colors.text, colors.border, "border-2 shadow-lg shadow-violet-50") : "bg-white text-pastel-subtext border-pastel-border"
-                  )}
-                >
-                  {isActive && <Check className="w-3 h-3" />}
-                  {tag.text}
-                </button>
-              );
-            }) : (
-              <p className="col-span-2 text-center text-[11px] italic text-pastel-subtext py-10">Không có thẻ nào khả dụng</p>
-            )}
+          <div>
+            <h3 className="font-bold text-pastel-text text-lg">Gán Tag</h3>
+            <p className="text-[11px] font-bold text-pastel-subtext uppercase">{card.name}</p>
           </div>
+        </div>
 
-          {isScheduling && (
-            <div className="bg-rose-50 p-6 rounded-[32px] border border-rose-100 space-y-4">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-rose-500" />
-                <span className="text-[10px] font-black uppercase text-rose-500 tracking-widest">Thiết lập giờ hẹn</span>
-              </div>
-              <input 
-                autoFocus
-                value={scheduleTime} onChange={e => setScheduleTime(e.target.value)}
-                placeholder="09.00 20.10"
-                className="w-full bg-white border-2 border-rose-200 rounded-2xl px-4 py-4 text-center font-black text-xl text-rose-600 outline-none"
-              />
-              <div className="flex gap-2">
-                <button onClick={() => setIsScheduling(false)} className="flex-1 py-3 bg-white text-slate-400 font-bold text-xs uppercase rounded-xl">Huỷ</button>
-                <button onClick={handleScheduleConfirm} className="flex-1 py-3 bg-rose-500 text-white font-black text-xs uppercase rounded-xl shadow-lg shadow-rose-100">Xác nhận</button>
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-2 mb-6">
+          {availTags.length > 0 ? availTags.map(tag => {
+            const colors = getTagColors(tag.text);
+            const isActive = card.tags.includes(tag.text);
+            return (
+              <button 
+                key={tag.text}
+                onClick={() => toggleTag(tag.text)}
+                className={cn(
+                  "py-2.5 px-3 rounded-2xl text-[11px] font-black border transition-all active:scale-95",
+                  isActive ? cn(colors.bg, colors.text, colors.border, "border-2") : "bg-pastel-bg text-pastel-subtext border-pastel-border"
+                )}
+              >
+                {tag.text}
+              </button>
+            );
+          }) : (
+            <p className="col-span-2 text-center text-[11px] italic text-pastel-subtext py-6">
+              Không có tag cho bước này
+            </p>
           )}
         </div>
-      </div>
 
-      <div className="p-4 bg-white border-t border-pastel-border">
-        <button onClick={onClose} className="w-full py-4.5 bg-violet-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-violet-100 active:scale-95 transition-transform">
-          Xác nhận hoàn tất
+        {showTimeInput.current && (
+          <div className="mb-6 animate-in slide-in-from-bottom-2">
+            <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1 mb-1 block">Chọn giờ (hh.mm dd.mm)</label>
+            <input 
+              type="text"
+              autoFocus
+              value={scheduleTime}
+              onChange={e => setScheduleTime(e.target.value)}
+              placeholder="09.00 20.10"
+              className="w-full bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border-2 border-rose-200"
+            />
+            <button 
+              onClick={handleScheduleConfirm}
+              className="w-full mt-2 py-2 bg-rose-500 text-white rounded-xl text-xs font-black"
+            >
+              Xác nhận lịch
+            </button>
+          </div>
+        )}
+
+        <button 
+          onClick={onClose} 
+          className="w-full py-4 font-black text-white bg-rose-400 rounded-2xl shadow-lg shadow-rose-200/50 active:scale-95 transition-all"
+        >
+          Hoàn tất
         </button>
-      </div>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }

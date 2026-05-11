@@ -1,34 +1,58 @@
 import React, { useState } from "react";
-import { X, Plus, Search, Trash2, Check, ChevronLeft, Save, Package } from "lucide-react";
+import { X, Plus, Search, Trash2, Check } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Product, CardProduct, Brand } from "../../types";
-import { cn } from "../../lib/utils";
+import { getTodayFormatted, getTimeFormatted } from "../../lib/utils";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 interface AddDoModalProps {
   initialProducts: CardProduct[];
   availableProducts: Product[];
   availableBrands: Brand[];
+  username: string;
   onSave: (products: CardProduct[]) => void;
   onClose: () => void;
 }
 
-export default function AddDoModal({ initialProducts, availableProducts, availableBrands, onSave, onClose }: AddDoModalProps) {
+export default function AddDoModal({ initialProducts, availableProducts, availableBrands, username, onSave, onClose }: AddDoModalProps) {
   const [products, setProducts] = useState<CardProduct[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
 
   const filteredProducts = availableProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleAddProduct = (product: Product) => {
     if (!products.find(p => p.productId === product.id)) {
-      setProducts([...products, { productId: product.id, tag: "Dò" }]);
+      setProducts([...products, { 
+        productId: product.id, 
+        tag: "Dò",
+        date: getTodayFormatted(),
+        time: getTimeFormatted(),
+        updatedAt: Date.now()
+      }]);
     }
     setSearchQuery("");
     setIsDropdownOpen(false);
   };
 
   const handleUpdateTag = (productId: string, tag: "Dò" | "Dò xong") => {
-    setProducts(products.map(p => p.productId === productId ? { ...p, tag } : p));
+    const product = products.find(p => p.productId === productId);
+    if (!product || product.tag === tag) return;
+
+    setConfirmConfig({
+      message: `Bạn có muốn chuyển trạng thái sản phẩm sang "${tag}" không?`,
+      action: () => {
+        setProducts(products.map(p => p.productId === productId ? { 
+          ...p, 
+          tag,
+          date: getTodayFormatted(),
+          time: getTimeFormatted(),
+          updatedAt: Date.now()
+        } : p));
+        setConfirmConfig(null);
+      }
+    });
   };
 
   const handleRemoveProduct = (productId: string) => {
@@ -41,114 +65,149 @@ export default function AddDoModal({ initialProducts, availableProducts, availab
   };
 
   return (
-    <motion.div 
-      initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-      transition={{ type: "spring", damping: 30, stiffness: 300 }}
-      className="fixed inset-0 bg-pastel-bg z-[1000] flex flex-col md:max-w-[430px] md:mx-auto md:border-x md:border-slate-200"
-    >
-      <div className="bg-white px-4 h-16 flex items-center gap-3 border-b border-pastel-border shrink-0">
-        <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-colors active:scale-95">
-          <ChevronLeft className="w-6 h-6 text-slate-600" />
-          <span className="font-black text-slate-600 text-sm">Quay lại</span>
-        </button>
-        <div className="h-6 w-[1px] bg-slate-200 mx-1" />
-        <h3 className="font-black text-lg text-emerald-500 uppercase tracking-tight text-center flex-1 pr-12">Sản phẩm dò</h3>
-      </div>
-
-      <div className="flex-1 overflow-y-auto no-scrollbar p-0 bg-slate-50">
-        {/* Search Header */}
-        <div className="bg-white p-4 border-b border-pastel-border sticky top-0 z-20 shadow-sm space-y-3">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-            <input 
-              type="text"
-              value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setIsDropdownOpen(true); }}
-              onFocus={() => setIsDropdownOpen(true)}
-              placeholder="Tìm kiếm sản phẩm..."
-              className="w-full pl-11 pr-4 py-3.5 bg-pastel-bg rounded-2xl text-[13px] font-bold outline-none border-2 border-transparent focus:border-emerald-300 transition-all shadow-inner"
-            />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6 bg-slate-900/40 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        <div className="flex items-center justify-between p-6 border-b border-pastel-border bg-pastel-bg/50">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-500">
+              <Search className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-800">Add/Dò Sản Phẩm</h2>
+              <p className="text-sm font-bold text-pastel-subtext mt-1">Quản lý sản phẩm dò cho thẻ</p>
+            </div>
           </div>
-
-          <AnimatePresence>
-            {isDropdownOpen && searchQuery && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                className="absolute left-4 right-4 mt-2 bg-white rounded-3xl border border-pastel-border shadow-2xl max-h-[400px] overflow-y-auto no-scrollbar z-[30] p-1 border-emerald-100"
-              >
-                {filteredProducts.length > 0 ? filteredProducts.map(p => {
-                  const isAdded = products.some(x => x.productId === p.id);
-                  return (
-                    <button 
-                      key={p.id} onClick={() => handleAddProduct(p)} disabled={isAdded}
-                      className={cn("w-full p-4 flex items-center justify-between rounded-2xl active:scale-98 transition-all border-b border-slate-50 last:border-0", isAdded ? "opacity-50" : "hover:bg-emerald-50")}
-                    >
-                      <div className="flex items-center gap-3 text-left">
-                        <div className="w-10 h-10 bg-pastel-bg rounded-xl flex items-center justify-center"><Package className="w-5 h-5 text-emerald-400" /></div>
-                        <span className="font-bold text-slate-700 text-sm line-clamp-1">{p.name}</span>
-                      </div>
-                      {isAdded ? <Check className="w-5 h-5 text-emerald-500" /> : <Plus className="w-5 h-5 text-slate-300" />}
-                    </button>
-                  );
-                }) : <div className="p-10 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Không có kết quả</div>}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <button 
+            onClick={onClose}
+            className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-pastel-subtext hover:bg-pastel-bg hover:text-slate-700 transition-colors shadow-sm"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Selected List */}
-        <div className="p-4 space-y-4 pb-24">
-          <div className="flex items-center justify-between px-2">
-            <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Đã chọn ({products.length})</h4>
-            {products.length > 0 && <span className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">Kéo xuống để lưu</span>}
+        <div className="p-6 flex-1 overflow-y-auto space-y-6">
+          <div className="relative">
+            <label className="text-sm font-bold text-slate-700 mb-2 block">Thêm sản phẩm</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-pastel-subtext" />
+              </div>
+              <input
+                type="text"
+                className="w-full bg-pastel-bg/50 border border-pastel-border rounded-2xl pl-11 pr-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-emerald-300 transition-colors"
+                placeholder="Tìm kiếm sản phẩm..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsDropdownOpen(true);
+                }}
+                onFocus={() => setIsDropdownOpen(true)}
+              />
+            </div>
+            
+            <AnimatePresence>
+              {isDropdownOpen && searchQuery && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute z-10 w-full mt-2 bg-white rounded-2xl border border-pastel-border shadow-lg max-h-60 overflow-y-auto"
+                >
+                  {filteredProducts.length > 0 ? (
+                    filteredProducts.map(product => {
+                      const isAdded = products.some(p => p.productId === product.id);
+                      return (
+                        <button
+                          key={product.id}
+                          onClick={() => handleAddProduct(product)}
+                          disabled={isAdded}
+                          className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between ${isAdded ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'hover:bg-pastel-bg active:bg-emerald-50'} border-b border-pastel-border/50 last:border-0`}
+                        >
+                          <span className="font-bold text-slate-700">{product.name}</span>
+                          {isAdded && <Check className="w-4 h-4 text-emerald-500" />}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-center text-sm font-medium text-pastel-subtext italic">
+                      Không tìm thấy sản phẩm phù hợp.
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="space-y-3">
-            {products.map(cp => {
-              const p = availableProducts.find(x => x.id === cp.productId);
-              if (!p) return null;
-              return (
-                <div key={cp.productId} className="bg-white p-4 rounded-3xl border border-pastel-border shadow-sm flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 bg-pastel-bg rounded-xl flex items-center justify-center overflow-hidden border border-emerald-50">
-                         {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-emerald-500/30" />}
-                       </div>
-                       <span className="font-bold text-slate-800 text-sm line-clamp-1">{p.name}</span>
+            <label className="text-sm font-bold text-slate-700 block">Danh sách sản phẩm đang dò</label>
+            {products.length === 0 ? (
+              <div className="text-center py-6 bg-pastel-bg/30 border border-dashed border-pastel-border rounded-3xl">
+                <p className="text-sm font-medium text-pastel-subtext italic">Chưa có sản phẩm nào</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {products.map((cardProduct) => {
+                  const productDef = availableProducts.find(p => p.id === cardProduct.productId);
+                  if (!productDef) return null;
+                  return (
+                    <div key={cardProduct.productId} className="flex items-center justify-between bg-white border border-pastel-border rounded-2xl p-3 shadow-sm">
+                      <div className="flex-1 min-w-0 pr-3">
+                        <p className="text-sm font-bold text-slate-800 line-clamp-2">{productDef.name}</p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-center gap-2">
+                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                          <button
+                            onClick={() => handleUpdateTag(cardProduct.productId, 'Dò')}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${cardProduct.tag === 'Dò' ? 'bg-amber-100 text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                            Dò
+                          </button>
+                          <button
+                            onClick={() => handleUpdateTag(cardProduct.productId, 'Dò xong')}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${cardProduct.tag === 'Dò xong' ? 'bg-emerald-100 text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                            Dò xong
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveProduct(cardProduct.productId)}
+                          className="p-2 text-pastel-subtext hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <button onClick={() => handleRemoveProduct(cp.productId)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"><Trash2 className="w-5 h-5" /></button>
-                  </div>
-                  <div className="flex bg-slate-50 p-1.5 rounded-2xl gap-2">
-                    <button 
-                      onClick={() => handleUpdateTag(cp.productId, 'Dò')}
-                      className={cn("flex-1 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all", cp.tag === 'Dò' ? "bg-amber-500 text-white shadow-lg shadow-amber-100" : "text-slate-400 hover:text-slate-600")}
-                    >
-                      Đ ang Dò
-                    </button>
-                    <button 
-                      onClick={() => handleUpdateTag(cp.productId, 'Dò xong')}
-                      className={cn("flex-1 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all", cp.tag === 'Dò xong' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-100" : "text-slate-400 hover:text-slate-600")}
-                    >
-                      Dò Xong
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {products.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 bg-white/50 rounded-[40px] border-2 border-dashed border-slate-200">
-                <Package className="w-12 h-12 text-slate-200 mb-2" />
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest text-center">Chưa có sản phẩm nào được chọn</p>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
-      </div>
 
-      <div className="p-4 bg-white border-t border-pastel-border shrink-0">
-        <button onClick={handleSave} className="w-full bg-emerald-500 text-white py-4.5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-100 active:scale-95 transition-transform flex items-center justify-center gap-3">
-          <Save className="w-5 h-5" /> Lưu danh sách
-        </button>
-      </div>
-    </motion.div>
+        <div className="p-6 border-t border-pastel-border bg-slate-50">
+          <button
+            onClick={handleSave}
+            className="w-full bg-emerald-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-200 active:scale-[0.98] transition-transform"
+          >
+            Lưu thay đổi
+          </button>
+        </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {confirmConfig && (
+          <ConfirmDialog 
+            message={confirmConfig.message}
+            onConfirm={confirmConfig.action}
+            onCancel={() => setConfirmConfig(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
