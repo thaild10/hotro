@@ -16,7 +16,7 @@ interface LoginProps {
 }
 
 export default function Login({ onLoginSuccess }: LoginProps) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -24,22 +24,25 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError("Vui lòng nhập đủ Email và Mật khẩu");
+    if (!username || !password) {
+      setError("Vui lòng nhập đủ Tên đăng nhập và Mật khẩu");
       return;
     }
 
+    // Automatically append domain if missing
+    const loginEmail = username.includes('@') ? username : `${username.toLowerCase()}@app.local`;
+    
     setLoading(true);
     setError(null);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // Extract username from email to display in app
-      const username = userCredential.user.email?.split('@')[0] || "User";
-      onLoginSuccess(username);
+      const userCredential = await signInWithEmailAndPassword(auth, loginEmail, password);
+      // Use the username prefix as the display name
+      const displayName = userCredential.user.email?.split('@')[0] || username;
+      onLoginSuccess(displayName);
     } catch (err: any) {
       console.error(err);
-      setError("Email hoặc mật khẩu không đúng");
+      setError("Tên đăng nhập hoặc mật khẩu không đúng");
     } finally {
       setLoading(false);
     }
@@ -62,11 +65,11 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <div className="relative">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 text-pastel-subtext w-5 h-5" />
             <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text" 
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-pastel-bg rounded-2xl py-4 pl-12 pr-4 text-sm font-bold outline-none border border-transparent focus:border-rose-200 transition-all" 
-              placeholder="Email" 
+              placeholder="Tên đăng nhập" 
             />
           </div>
 
