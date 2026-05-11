@@ -453,9 +453,12 @@ function ProductTab({
         setImageUrl(url);
       } catch (error) {
         console.error("Upload fail:", error);
-        alert(error instanceof Error ? error.message : "Upload ảnh thất bại!");
+        alert(error instanceof Error ? error.message : "Upload ảnh thất bại, vui lòng thử lại!");
       } finally {
         setIsUploading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
   };
@@ -913,9 +916,12 @@ function DetailEditor({
         setImageUrl(url);
       } catch (error) {
         console.error("Upload fail:", error);
-        alert(error instanceof Error ? error.message : "Upload ảnh thất bại!");
+        alert(error instanceof Error ? error.message : "Upload ảnh thất bại, vui lòng thử lại!");
       } finally {
         setIsUploading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
   };

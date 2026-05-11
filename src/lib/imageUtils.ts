@@ -8,7 +8,14 @@ export interface CompressionSettings {
 
 export const compressImage = (file: File, settings: CompressionSettings): Promise<Blob> => {
   return new Promise((resolve, reject) => {
+    console.log(`Starting compression for ${file.name} (${(file.size / 1024).toFixed(1)} KB)...`);
     const reader = new FileReader();
+    
+    // Set a timeout for the whole process
+    const timeout = setTimeout(() => {
+      reject(new Error('Xử lý ảnh quá lâu (Timeout)'));
+    }, 15000);
+
     reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
@@ -28,14 +35,19 @@ export const compressImage = (file: File, settings: CompressionSettings): Promis
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
+          clearTimeout(timeout);
           reject(new Error('Could not get canvas context'));
           return;
         }
 
         ctx.drawImage(img, 0, 0, width, height);
+        console.log(`Canvas generated: ${width}x${height}. Converting to blob...`);
+        
         canvas.toBlob(
           (blob) => {
+            clearTimeout(timeout);
             if (blob) {
+              console.log(`Compression complete. New size: ${(blob.size / 1024).toFixed(1)} KB`);
               resolve(blob);
             } else {
               reject(new Error('Canvas toBlob returned null'));
@@ -45,9 +57,15 @@ export const compressImage = (file: File, settings: CompressionSettings): Promis
           settings.quality / 100
         );
       };
-      img.onerror = () => reject(new Error('Image load error'));
+      img.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error('Image load error'));
+      };
     };
-    reader.onerror = () => reject(new Error('FileReader error'));
+    reader.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error('FileReader error'));
+    };
   });
 };
 
@@ -61,19 +79,17 @@ export const uploadToFirebase = async (
     blob = await compressImage(file, settings);
   }
   
-  try {
-    const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    const storageRef = ref(storage, `${folder}/${filename}`);
-    console.log(`Uploading to ${folder}/${filename}...`);
-    await uploadBytes(storageRef, blob);
-    const url = await getDownloadURL(storageRef);
-    console.log(`Upload successful: ${url}`);
-    return url;
-  } catch (error) {
-    console.error("Firebase Storage Error:", error);
-    if (error instanceof Error) {
-      throw new Error(`Lỗi upload: ${error.message}`);
-    }
-    throw error;
-  }
+  // Convert directly to base64 Data URL to store in Firestore and avoid Storage blocks
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to read image as base64'));
+      }
+    };
+    reader.onerror = () => reject(new Error('FileReader error during base64 conversion'));
+  });
 };
