@@ -169,7 +169,8 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
               doctorDate: c.doctorDate || "",
               doctorHidden: !!c.doctorHidden,
               notified: !!c.notified,
-              notifiedTime: c.notifiedTime || ""
+              notifiedTime: c.notifiedTime || "",
+              products: c.products || []
             })), 
             tagsConfig,
             customers,
@@ -195,7 +196,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const timer = setTimeout(saveData, 2000); // Increased debounce to 2s
       return () => clearTimeout(timer);
     }
-  }, [cards, tagsConfig, customers]);
+  }, [cards, tagsConfig, customers, users, brands, productCategories, products]);
 
   const handleCreateCard = () => {
     setIsCreatingCard(true);
@@ -338,8 +339,8 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     }
 
     if (activeTab === 0) {
-      const todayStr = getTodayFormatted();
-      list = cards.filter(c => c.doDate === todayStr && c.tabId !== 6);
+      const todayTime = parseDateString(getTodayFormatted()).getTime();
+      list = cards.filter(c => c.tabId !== 6 && c.doDate && parseDateString(c.doDate).getTime() <= todayTime);
     } else {
       list = cards.filter(c => c.tabId === activeTab);
     }
@@ -442,7 +443,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                     "ml-1.5 flex items-center justify-center text-xs px-2 py-0.5 rounded-full font-black",
                     isActive ? "bg-rose-100 text-rose-500" : "bg-pastel-bg text-pastel-subtext"
                   )}>
-                    {cards.filter(c => c.tabId === 0).length}
+                    {cards.filter(c => c.tabId !== 6 && c.doDate && parseDateString(c.doDate).getTime() <= parseDateString(getTodayFormatted()).getTime()).length}
                   </span>
                 )}
                 {isActive && (

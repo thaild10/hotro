@@ -128,17 +128,8 @@ function BrandTab({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Top bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-pastel-border">
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setSortAsc(!sortAsc)}
-            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none w-full sm:w-auto"
-          >
-            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
-            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
-          </button>
-        </div>
-        <div className="flex items-center gap-3 flex-1 w-full sm:max-w-md">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <input 
             type="text"
             value={newName}
@@ -152,6 +143,15 @@ function BrandTab({
             className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform whitespace-nowrap"
           >
             Tạo
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setSortAsc(!sortAsc)}
+            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none w-full sm:w-auto"
+          >
+            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
+            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
           </button>
         </div>
       </div>
@@ -276,17 +276,8 @@ function CategoryTab({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Top bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-pastel-border">
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setSortAsc(!sortAsc)}
-            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none w-full sm:w-auto"
-          >
-            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
-            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
-          </button>
-        </div>
-        <div className="flex items-center gap-3 flex-1 w-full sm:max-w-md">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <input 
             type="text"
             value={newName}
@@ -300,6 +291,15 @@ function CategoryTab({
             className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform whitespace-nowrap"
           >
             Tạo
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setSortAsc(!sortAsc)}
+            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none w-full sm:w-auto"
+          >
+            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
+            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
           </button>
         </div>
       </div>
@@ -439,8 +439,8 @@ function ProductTab({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Top bar */}
-      <div className="flex flex-col gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 min-w-0">
           <input 
             type="text"
             value={newName}
@@ -449,11 +449,11 @@ function ProductTab({
             placeholder="Nhập tên sản phẩm mới..."
             className="flex-1 bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors min-w-0"
           />
-          <div className="flex gap-2 min-w-0">
+          <div className="flex flex-col sm:flex-row gap-3 min-w-0">
             <select
               value={selectedBrand}
               onChange={e => setSelectedBrand(e.target.value)}
-              className="flex-1 sm:flex-none sm:w-[120px] bg-pastel-bg rounded-xl px-2 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
+              className="flex-1 sm:flex-none sm:w-[130px] bg-pastel-bg rounded-xl px-3 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
             >
               <option value="">- Chọn hãng -</option>
               {brands.map(b => (
@@ -463,7 +463,7 @@ function ProductTab({
             <select
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
-              className="flex-1 sm:flex-none sm:w-[120px] bg-pastel-bg rounded-xl px-2 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
+              className="flex-1 sm:flex-none sm:w-[130px] bg-pastel-bg rounded-xl px-3 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
             >
               <option value="">- Chọn loại -</option>
               {categories.map(c => (
@@ -473,18 +473,18 @@ function ProductTab({
           </div>
           <button 
             onClick={handleCreate}
-            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform"
+            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform whitespace-nowrap"
           >
             Tạo
           </button>
         </div>
         
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => setSortAsc(!sortAsc)}
-            className="flex items-center gap-2 px-4 py-2 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none text-sm w-full sm:w-auto justify-center"
+            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none text-sm w-full lg:w-auto shrink-0"
           >
-            {sortAsc ? <ArrowDownAZ className="w-4 h-4 text-amber-500" /> : <ArrowUpZA className="w-4 h-4 text-amber-500" />}
+            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
             {sortAsc ? "Từ A - Z" : "Từ Z - A"}
           </button>
         </div>
