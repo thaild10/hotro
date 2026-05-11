@@ -397,13 +397,15 @@ function ProductTab({
   const [newName, setNewName] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [error, setError] = useState<string | null>(null);
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
   const handleCreate = () => {
     if (!newName.trim() || !selectedBrand || !selectedCategory) {
-      alert("Vui lòng nhập tên sản phẩm, chọn hãng và chọn loại.");
+      setError("Vui lòng nhập tên, chọn hãng và loại");
+      setTimeout(() => setError(null), 3000);
       return;
     }
     const newProduct: Product = { 
@@ -414,6 +416,7 @@ function ProductTab({
     };
     onUpdateProducts([...products, newProduct]);
     setNewName("");
+    setError(null);
   };
 
   const handleSaveEdit = (id: string) => {
@@ -439,21 +442,26 @@ function ProductTab({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Top bar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border relative">
+        {error && (
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-full animate-bounce whitespace-nowrap">
+            {error}
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 min-w-0">
           <input 
             type="text"
             value={newName}
-            onChange={e => setNewName(e.target.value)}
+            onChange={e => { setNewName(e.target.value); setError(null); }}
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            placeholder="Nhập tên sản phẩm mới..."
+            placeholder="Tên sản phẩm mới..."
             className="flex-1 bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors min-w-0"
           />
-          <div className="flex flex-col sm:flex-row gap-3 min-w-0">
+          <div className="flex flex-col sm:flex-row gap-2 min-w-0">
             <select
               value={selectedBrand}
-              onChange={e => setSelectedBrand(e.target.value)}
-              className="flex-1 sm:flex-none sm:w-[130px] bg-pastel-bg rounded-xl px-3 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
+              onChange={e => { setSelectedBrand(e.target.value); setError(null); }}
+              className="flex-1 sm:flex-none sm:w-[140px] bg-pastel-bg rounded-xl px-3 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
             >
               <option value="">- Chọn hãng -</option>
               {brands.map(b => (
@@ -462,8 +470,8 @@ function ProductTab({
             </select>
             <select
               value={selectedCategory}
-              onChange={e => setSelectedCategory(e.target.value)}
-              className="flex-1 sm:flex-none sm:w-[130px] bg-pastel-bg rounded-xl px-3 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
+              onChange={e => { setSelectedCategory(e.target.value); setError(null); }}
+              className="flex-1 sm:flex-none sm:w-[140px] bg-pastel-bg rounded-xl px-3 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
             >
               <option value="">- Chọn loại -</option>
               {categories.map(c => (

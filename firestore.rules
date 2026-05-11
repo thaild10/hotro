@@ -33,10 +33,14 @@ service cloud.firestore {
         return data.keys().hasAll(['cards', 'tagsConfig']) &&
                data.cards is list &&
                data.tagsConfig is map &&
+               (!data.keys().hasAny(['customers']) || data.customers is list) &&
+               (!data.keys().hasAny(['users']) || data.users is list) &&
+               (!data.keys().hasAny(['brands']) || data.brands is list) &&
+               (!data.keys().hasAny(['productCategories']) || data.productCategories is list) &&
+               (!data.keys().hasAny(['products']) || data.products is list) &&
                // Limit array sizes to avoid DoW (Denial of Wallet)
                data.cards.size() <= 1000 &&
-               data.keys().hasAll(['cards', 'tagsConfig']) &&
-               (data.keys().size() == 2 || (data.keys().hasAll(['customers']) && data.keys().size() == 3));
+               data.keys().size() <= 15;
       }
 
       allow get: if isOwner(username);

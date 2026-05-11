@@ -325,6 +325,11 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     updateCard(cardId, { logs: [log, ...card.logs] });
   };
 
+  const overdueCards = useMemo(() => {
+    const today = parseDateString(getTodayFormatted()).getTime();
+    return cards.filter(c => c.tabId !== 6 && c.doDate && parseDateString(c.doDate).getTime() <= today);
+  }, [cards]);
+
   const filteredCards = useMemo(() => {
     let list = cards;
     
@@ -339,8 +344,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     }
 
     if (activeTab === 0) {
-      const todayTime = parseDateString(getTodayFormatted()).getTime();
-      list = cards.filter(c => c.tabId !== 6 && c.doDate && parseDateString(c.doDate).getTime() <= todayTime);
+      list = overdueCards;
     } else {
       list = cards.filter(c => c.tabId === activeTab);
     }
@@ -351,7 +355,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const dateB = parseDateString(b.doDate);
       return dateA.getTime() - dateB.getTime();
     });
-  }, [cards, activeTab, searchQuery]);
+  }, [cards, activeTab, searchQuery, overdueCards]);
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-pastel-bg">
@@ -443,7 +447,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                     "ml-1.5 flex items-center justify-center text-xs px-2 py-0.5 rounded-full font-black",
                     isActive ? "bg-rose-100 text-rose-500" : "bg-pastel-bg text-pastel-subtext"
                   )}>
-                    {cards.filter(c => c.tabId !== 6 && c.doDate && parseDateString(c.doDate).getTime() <= parseDateString(getTodayFormatted()).getTime()).length}
+                    {overdueCards.length}
                   </span>
                 )}
                 {isActive && (

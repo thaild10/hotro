@@ -2,7 +2,7 @@
   "entities": {
     "AppData": {
       "title": "AppData",
-      "description": "User specific application data including kanban cards and tag configurations.",
+      "description": "User specific application data including kanban cards, tag configurations, and product management data.",
       "type": "object",
       "properties": {
         "cards": {
@@ -25,6 +25,30 @@
           "items": {
             "$ref": "#/entities/Customer"
           }
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/UserAccount"
+          }
+        },
+        "brands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/Brand"
+          }
+        },
+        "productCategories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/ProductCategory"
+          }
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/Product"
+          }
         }
       },
       "required": ["cards", "tagsConfig"]
@@ -37,6 +61,46 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "imageUrl": { "type": "string" }
+      }
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "A user account in the system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Nhân viên"] }
+      }
+    },
+    "Brand": {
+      "title": "Brand",
+      "description": "A product brand.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "ProductCategory": {
+      "title": "ProductCategory",
+      "description": "A category for products.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A specific product.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "brandId": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "price": { "type": "number" }
       }
     },
     "KanbanCard": {
