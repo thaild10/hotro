@@ -194,7 +194,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       {/* Header */}
       <header className="bg-white px-3 py-3 border-b border-pastel-border shrink-0 shadow-sm flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 shrink-0">
-          <h1 className="text-xs font-bold text-rose-400">Dò khách</h1>
+          <h1 className="text-xs font-bold text-rose-400">Hỗ trợ quản lý</h1>
         </div>
 
         <div className="flex-1 relative max-w-[300px]">

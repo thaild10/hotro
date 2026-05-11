@@ -7,22 +7,16 @@ import {
   CircleAlert 
 } from "lucide-react";
 import { auth } from "../firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
-
-const USER_MAP: Record<string, string> = {
-  thaild: "thaild@app.local",
-  linhnt: "linhnt@app.local",
-  anhld: "anhld@app.local",
-};
 
 interface LoginProps {
   onLoginSuccess: (username: string) => void;
 }
 
 export default function Login({ onLoginSuccess }: LoginProps) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,33 +24,22 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
-      setError("Vui lòng nhập đủ Tên và Mật khẩu");
+    if (!email || !password) {
+      setError("Vui lòng nhập đủ Email và Mật khẩu");
       return;
     }
 
-    const email = USER_MAP[username.toLowerCase()] || `${username.toLowerCase()}@app.local`;
-    
     setLoading(true);
     setError(null);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Extract username from email to display in app
+      const username = userCredential.user.email?.split('@')[0] || "User";
       onLoginSuccess(username);
     } catch (err: any) {
       console.error(err);
-      // Auto-create account for internal users on first try
-      if (USER_MAP[username.toLowerCase()]) {
-        try {
-          await createUserWithEmailAndPassword(auth, email, password);
-          onLoginSuccess(username);
-          return;
-        } catch (regErr: any) {
-          // If already exists or other error, fallback to error message
-          console.error("Auto-reg fallback:", regErr);
-        }
-      }
-      setError("Tên đăng nhập hoặc mật khẩu không đúng");
+      setError("Email hoặc mật khẩu không đúng");
     } finally {
       setLoading(false);
     }
@@ -79,11 +62,11 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <div className="relative">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 text-pastel-subtext w-5 h-5" />
             <input 
-              type="text" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-pastel-bg rounded-2xl py-4 pl-12 pr-4 text-sm font-bold outline-none border border-transparent focus:border-rose-200 transition-all" 
-              placeholder="Tên đăng nhập" 
+              placeholder="Email" 
             />
           </div>
 
