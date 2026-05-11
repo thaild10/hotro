@@ -4,7 +4,7 @@ import {
   signOut,
   User as FirebaseUser
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import Login from "./components/Login";
 import KanbanApp from "./components/KanbanApp";
@@ -17,47 +17,53 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        // Fetch data from Firestore
         const storedUsername = localStorage.getItem("app_auth_user");
         if (storedUsername) {
-          await loadUserData(storedUsername);
+          setUsername(storedUsername);
         }
       } else {
         setAppData(null);
+        setUsername(null);
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
   }, []);
 
-  const loadUserData = async (username: string) => {
-    try {
-      const docRef = doc(db, "appdata", username);
-      const docSnap = await getDoc(docRef);
+  // Real-time data sync
+  useEffect(() => {
+    if (!user) return;
+
+    // Use a shared document for all 3 users
+    const docRef = doc(db, "appdata", "shared_kanban");
+    
+    const unsubscribeData = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         setAppData(docSnap.data() as AppData);
       } else {
-        // Initial data
+        // Initialize shared data if it doesn't exist
         const initialData: AppData = {
           cards: [],
           tagsConfig: DEFAULT_TAGS,
         };
+        setDoc(docRef, initialData);
         setAppData(initialData);
-        await setDoc(docRef, initialData);
       }
-    } catch (error) {
-      console.error("Error loading data:", error);
-    }
-  };
+    }, (error) => {
+      console.error("Error syncing data:", error);
+    });
 
-  const handleLoginSuccess = async (newUsername: string) => {
+    return () => unsubscribeData();
+  }, [user]);
+
+  const handleLoginSuccess = (newUsername: string) => {
     localStorage.setItem("app_auth_user", newUsername);
     setUsername(newUsername);
-    await loadUserData(newUsername);
+    // Data sync is handled by the useEffect above
   };
 
   const handleLogout = async () => {
@@ -68,10 +74,13 @@ export default function App() {
     setAppData(null);
   };
 
-  if (loading) {
+  if (loading || (user && !appData)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-pastel-bg">
-        <div className="w-12 h-12 border-4 border-rose-200 border-t-rose-400 rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-rose-200 border-t-rose-400 rounded-full animate-spin"></div>
+          <div className="text-rose-400 font-bold text-sm">Đang đồng bộ dữ liệu...</div>
+        </div>
       </div>
     );
   }

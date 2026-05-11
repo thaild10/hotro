@@ -24,7 +24,8 @@ service cloud.firestore {
       function isOwner(username) {
         return isSignedIn() && (
           username == getUsernameFromEmail() || 
-          username == request.auth.uid // Fallback for various auth types
+          username == request.auth.uid ||
+          username == "shared_kanban" // Allow shared document for all authenticated users
         );
       }
 

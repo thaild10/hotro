@@ -28,8 +28,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [isRegister, setIsRegister] = useState(false);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !password) {
@@ -43,24 +41,22 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
-      if (isRegister) {
-        await createUserWithEmailAndPassword(auth, email, password);
-        onLoginSuccess(username);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-        onLoginSuccess(username);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      onLoginSuccess(username);
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
-        setError("Tên đăng nhập này đã được đăng ký");
-      } else if (err.code === 'auth/weak-password') {
-        setError("Mật khẩu phải có ít nhất 6 ký tự");
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError("Vui lòng bật Email/Password trong Firebase Console");
-      } else {
-        setError("Tên đăng nhập hoặc mật khẩu không đúng");
+      // Auto-create account for internal users on first try
+      if (USER_MAP[username.toLowerCase()]) {
+        try {
+          await createUserWithEmailAndPassword(auth, email, password);
+          onLoginSuccess(username);
+          return;
+        } catch (regErr: any) {
+          // If already exists or other error, fallback to error message
+          console.error("Auto-reg fallback:", regErr);
+        }
       }
+      setError("Tên đăng nhập hoặc mật khẩu không đúng");
     } finally {
       setLoading(false);
     }
@@ -77,7 +73,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <LockKeyhole className="w-10 h-10 text-rose-400" />
         </div>
         
-        <h2 className="text-2xl font-bold mb-8">{isRegister ? "Đăng ký" : "Đăng nhập"}</h2>
+        <h2 className="text-2xl font-bold mb-8">Đăng nhập</h2>
         
         <form onSubmit={handleLogin} className="w-full space-y-4">
           <div className="relative">
@@ -117,16 +113,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               loading && "opacity-70 cursor-not-allowed"
             )}
           >
-            {loading ? "Đang xử lý..." : (isRegister ? "Đăng ký ngay" : "Đăng nhập")}
+            {loading ? "Đang xử lý..." : "Đăng nhập"}
           </button>
         </form>
-
-        <button 
-          onClick={() => setIsRegister(!isRegister)}
-          className="mt-6 text-xs font-bold text-pastel-subtext hover:text-rose-400 transition-colors"
-        >
-          {isRegister ? "Đã có tài khoản? Đăng nhập" : "Chưa có tài khoản? Đăng ký"}
-        </button>
 
         <AnimatePresence>
           {error && (

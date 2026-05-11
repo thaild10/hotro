@@ -43,7 +43,7 @@ interface KanbanAppProps {
 export default function KanbanApp({ username, initialData, onLogout }: KanbanAppProps) {
   const [cards, setCards] = useState<KanbanCard[]>(initialData.cards || []);
   const [tagsConfig, setTagsConfig] = useState<Record<number, Tag[]>>(initialData.tagsConfig || DEFAULT_TAGS);
-  const [activeTab, setActiveTab] = useState(1);
+  const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "offline">("saved");
   
@@ -58,18 +58,51 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const prevCardsRef = useRef(cards);
   const prevTagsRef = useRef(tagsConfig);
 
+  // Update local state when incoming data changes (remote updates)
+  useEffect(() => {
+    const serverCards = initialData.cards || [];
+    const serverTags = initialData.tagsConfig || DEFAULT_TAGS;
+
+    if (saveStatus === "saved") {
+      const cardsMatch = JSON.stringify(serverCards) === JSON.stringify(cards);
+      const tagsMatch = JSON.stringify(serverTags) === JSON.stringify(tagsConfig);
+
+      if (!cardsMatch) {
+        setCards(serverCards);
+        prevCardsRef.current = serverCards;
+      }
+      if (!tagsMatch) {
+        setTagsConfig(serverTags);
+        prevTagsRef.current = serverTags;
+      }
+    }
+  }, [initialData, saveStatus]);
+
   // Sync with Firestore
   useEffect(() => {
-    const shouldSave = 
-      JSON.stringify(prevCardsRef.current) !== JSON.stringify(cards) || 
-      JSON.stringify(prevTagsRef.current) !== JSON.stringify(tagsConfig);
+    const cardsChanged = JSON.stringify(prevCardsRef.current) !== JSON.stringify(cards);
+    const tagsChanged = JSON.stringify(prevTagsRef.current) !== JSON.stringify(tagsConfig);
+    const shouldSave = cardsChanged || tagsChanged;
 
     if (shouldSave) {
       const saveData = async () => {
         setSaveStatus("saving");
         try {
-          const docRef = doc(db, "appdata", username);
-          await setDoc(docRef, { cards, tagsConfig });
+          const docRef = doc(db, "appdata", "shared_kanban");
+          await setDoc(docRef, { 
+            cards: cards.map(c => ({
+              ...c,
+              // Ensure no undefined values which might cause rule issues
+              doneDate: c.doneDate || null,
+              collapsed: !!c.collapsed,
+              doctorText: c.doctorText || "",
+              doctorDate: c.doctorDate || "",
+              doctorHidden: !!c.doctorHidden,
+              notified: !!c.notified,
+              notifiedTime: c.notifiedTime || ""
+            })), 
+            tagsConfig 
+          });
           setSaveStatus("saved");
           prevCardsRef.current = cards;
           prevTagsRef.current = tagsConfig;
@@ -79,10 +112,10 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         }
       };
 
-      const timer = setTimeout(saveData, 1000);
+      const timer = setTimeout(saveData, 2000); // Increased debounce to 2s
       return () => clearTimeout(timer);
     }
-  }, [cards, tagsConfig, username]);
+  }, [cards, tagsConfig]);
 
   const handleCreateCard = () => {
     const targetTab = activeTab === 0 ? 1 : activeTab;
@@ -177,7 +210,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
         <div className="flex items-center gap-1 shrink-0">
           <div className={cn(
-            "flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg transition-all",
+            "flex items-center gap-1 text-[9px] font-bold px-2 py-2.5 rounded-lg transition-all",
             saveStatus === "saving" && "bg-amber-50 text-amber-600 border border-amber-200",
             saveStatus === "saved" && "bg-emerald-50 text-emerald-600 border border-emerald-200",
             (saveStatus === "error" || saveStatus === "offline") && "bg-rose-50 text-rose-500 border border-rose-200"
