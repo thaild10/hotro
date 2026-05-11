@@ -61,6 +61,14 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "offline">("saved");
+  const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
+  const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
+
+  // Auto-detect device
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+    setDeviceView(isMobile ? "mobile" : "desktop");
+  }, []);
 
   // Determine user role
   const currentUserRole = users.find(u => u.username === username)?.role || "Admin"; // Defaults to Admin if unconfigured
@@ -358,7 +366,10 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   }, [cards, activeTab, searchQuery, overdueCards]);
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-pastel-bg">
+    <div className={cn(
+      "flex flex-col h-screen overflow-hidden bg-pastel-bg transition-all duration-300 ease-in-out",
+      deviceView === 'mobile' ? "max-w-[430px] mx-auto border-x border-slate-200 shadow-2xl relative" : "w-full"
+    )}>
       {/* Header */}
       <header className="bg-white px-3 py-3 border-b border-pastel-border shrink-0 shadow-sm flex items-center justify-between gap-3">
         <div className="flex-1 relative max-w-md">
@@ -374,47 +385,77 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
         <div className="flex items-center gap-3 shrink-0">
           <div className={cn(
-            "flex items-center gap-2 text-sm font-bold px-4 py-3 rounded-2xl transition-all",
+            "flex items-center justify-center w-12 h-12 rounded-2xl transition-all",
             saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-200",
             saveStatus === "saved" && "bg-teal-50 text-teal-600 border border-teal-200",
             (saveStatus === "error" || saveStatus === "offline") && "bg-red-50 text-red-500 border border-red-200"
           )}>
-            {saveStatus === "saving" && <CloudUpload className="w-5 h-5" />}
-            {saveStatus === "saved" && <Cloud className="w-5 h-5" />}
-            {(saveStatus === "error" || saveStatus === "offline") && <CloudOff className="w-5 h-5" />}
-            <span className="hidden sm:inline">{saveStatus === "saving" ? "Đang lưu" : saveStatus === "saved" ? "Đã lưu" : "Lỗi lưu"}</span>
+            {saveStatus === "saving" && <CloudUpload className="w-6 h-6" />}
+            {saveStatus === "saved" && <Cloud className="w-6 h-6" />}
+            {(saveStatus === "error" || saveStatus === "offline") && <CloudOff className="w-6 h-6" />}
           </div>
           
           {currentUserRole === 'Admin' && (
             <>
               <button 
+                onMouseEnter={() => setHoveredBtn('tags')}
+                onMouseLeave={() => setHoveredBtn(null)}
                 onClick={() => setShowTagManagement(true)}
-                className="text-sm font-bold bg-violet-50 text-violet-500 px-4 py-3 rounded-2xl border border-violet-100 active:scale-95 transition-all text-center flex items-center min-h-[48px]"
+                className={cn(
+                  "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
+                  hoveredBtn === 'tags' ? "bg-violet-500 text-white w-auto px-4" : "bg-violet-50 text-violet-500 w-12"
+                )}
               >
-                Quản lý Tag
+                <TagIcon className="w-6 h-6 shrink-0" />
+                {hoveredBtn === 'tags' && <span className="text-sm font-black whitespace-nowrap">Quản lý Tag</span>}
               </button>
 
               <button 
+                onMouseEnter={() => setHoveredBtn('accounts')}
+                onMouseLeave={() => setHoveredBtn(null)}
                 onClick={() => setShowAccountManagement(true)}
-                className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center border border-indigo-100 active:scale-95 transition-all shrink-0"
+                className={cn(
+                  "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
+                  hoveredBtn === 'accounts' ? "bg-indigo-500 text-white w-auto px-4" : "bg-indigo-50 text-indigo-500 w-12"
+                )}
               >
-                <Shield className="w-6 h-6" />
+                <Shield className="w-6 h-6 shrink-0" />
+                {hoveredBtn === 'accounts' && <span className="text-sm font-black whitespace-nowrap">Tài khoản</span>}
               </button>
 
               <button 
+                onMouseEnter={() => setHoveredBtn('products')}
+                onMouseLeave={() => setHoveredBtn(null)}
                 onClick={() => setShowProductManagement(true)}
-                className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-100 active:scale-95 transition-all shrink-0"
+                className={cn(
+                  "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
+                  hoveredBtn === 'products' ? "bg-amber-500 text-white w-auto px-4" : "bg-amber-50 text-amber-500 w-12"
+                )}
               >
-                <Package className="w-6 h-6" />
+                <Package className="w-6 h-6 shrink-0" />
+                {hoveredBtn === 'products' && <span className="text-sm font-black whitespace-nowrap">Sản phẩm</span>}
               </button>
             </>
           )}
 
           <button 
+            onMouseEnter={() => setHoveredBtn('customers')}
+            onMouseLeave={() => setHoveredBtn(null)}
             onClick={() => setShowCustomerManagement(true)}
-            className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-500 flex items-center justify-center border border-violet-100 active:scale-95 transition-all shrink-0"
+            className={cn(
+              "h-12 rounded-2xl flex items-center justify-center transition-all px-3 gap-2 overflow-hidden",
+              hoveredBtn === 'customers' ? "bg-rose-500 text-white w-auto px-4" : "bg-rose-50 text-rose-500 w-12"
+            )}
           >
-            <Users className="w-6 h-6" />
+            <Users className="w-6 h-6 shrink-0" />
+            {hoveredBtn === 'customers' && <span className="text-sm font-black whitespace-nowrap">Khách hàng</span>}
+          </button>
+
+          <button 
+            onClick={() => setDeviceView(prev => prev === 'desktop' ? 'mobile' : 'desktop')}
+            className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all shrink-0"
+          >
+            {deviceView === 'desktop' ? <Settings2 className="w-6 h-6" /> : <Settings2 className="w-6 h-6 text-rose-400 rotate-90" />}
           </button>
           
           <button 
@@ -542,8 +583,8 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           card={cards.find(c => c.id === tagModalCardId)!}
           tagsConfig={tagsConfig}
           onClose={() => setTagModalCardId(null)}
-          onUpdateTags={(newTags) => {
-            updateCard(tagModalCardId, { tags: newTags });
+          onUpdateCard={(updates) => {
+            updateCard(tagModalCardId, updates);
           }}
         />
       )}

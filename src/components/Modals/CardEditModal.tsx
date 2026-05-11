@@ -70,7 +70,7 @@ export default function CardEditModal({ card, customers = [], onClose, onSave, o
                 setError(null);
               }}
               onFocus={() => setShowSuggestions(true)}
-              className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-[14px] font-bold uppercase outline-none focus:border-rose-200"
+              className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-[14px] font-bold outline-none focus:border-rose-200"
               placeholder="Họ tên khách"
             />
             {/* Suggestions */}
@@ -96,7 +96,7 @@ export default function CardEditModal({ card, customers = [], onClose, onSave, o
                       ) : (
                         <div className="w-6 h-6 rounded-md bg-pastel-bg flex items-center justify-center"><NotebookPen className="w-3 h-3 text-pastel-subtext" /></div>
                       )}
-                      <span className="uppercase">{s.name}</span>
+                      <span className="">{s.name}</span>
                     </button>
                   ))}
                 </motion.div>

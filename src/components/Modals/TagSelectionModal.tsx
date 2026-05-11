@@ -26,18 +26,49 @@ interface TagSelectionModalProps {
   card: KanbanCard;
   tagsConfig: Record<number, Tag[]>;
   onClose: () => void;
-  onUpdateTags: (tags: string[]) => void;
+  onUpdateCard: (updates: Partial<KanbanCard>) => void;
 }
 
-export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateTags }: TagSelectionModalProps) {
+export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateCard }: TagSelectionModalProps) {
   const availTags = tagsConfig[card.tabId] || [];
+  const [scheduleTime, setScheduleTime] = React.useState("");
+  const showTimeInput = React.useRef(false);
   
   const toggleTag = (tagText: string) => {
-    if (card.tags.includes(tagText)) {
-      onUpdateTags(card.tags.filter(t => t !== tagText));
-    } else {
-      onUpdateTags([...card.tags, tagText]);
+    // Single select for Tab 5 (Spa)
+    if (card.tabId === 5) {
+      if (card.tags.includes(tagText)) {
+        onUpdateCard({ tags: [] });
+      } else {
+        // Special logic for "Xếp lịch"
+        if (tagText === "Xếp lịch") {
+          showTimeInput.current = true;
+          // We'll handle the actual update after time selection
+          return;
+        }
+        onUpdateCard({ tags: [tagText] });
+      }
+      return;
     }
+
+    // Default multi-select
+    if (card.tags.includes(tagText)) {
+      onUpdateCard({ tags: card.tags.filter(t => t !== tagText) });
+    } else {
+      onUpdateCard({ tags: [...card.tags, tagText] });
+    }
+  };
+
+  const handleScheduleConfirm = () => {
+    if (!scheduleTime.trim()) return;
+    const scheduleStr = `🔔 Hẹn: ${scheduleTime}`;
+    // Update note automatically as requested
+    const newNote = card.note ? `${card.note}\n${scheduleStr}` : scheduleStr;
+    onUpdateCard({ 
+      tags: ["Xếp lịch"],
+      note: newNote
+    });
+    onClose();
   };
 
   return (
@@ -79,6 +110,26 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateT
             </p>
           )}
         </div>
+
+        {showTimeInput.current && (
+          <div className="mb-6 animate-in slide-in-from-bottom-2">
+            <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1 mb-1 block">Chọn giờ (hh.mm dd.mm)</label>
+            <input 
+              type="text"
+              autoFocus
+              value={scheduleTime}
+              onChange={e => setScheduleTime(e.target.value)}
+              placeholder="09.00 20.10"
+              className="w-full bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border-2 border-rose-200"
+            />
+            <button 
+              onClick={handleScheduleConfirm}
+              className="w-full mt-2 py-2 bg-rose-500 text-white rounded-xl text-xs font-black"
+            >
+              Xác nhận lịch
+            </button>
+          </div>
+        )}
 
         <button 
           onClick={onClose} 

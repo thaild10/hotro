@@ -116,7 +116,7 @@ export default function Card({
           <div className="flex flex-col">
             <span 
               onClick={onEdit}
-              className="font-bold text-base uppercase tracking-wide truncate max-w-[150px] cursor-pointer hover:text-rose-500 transition-colors"
+              className="font-bold text-base tracking-wide truncate max-w-[150px] cursor-pointer hover:text-rose-500 transition-colors"
             >
               {card.name}
             </span>
@@ -228,8 +228,11 @@ export default function Card({
                 <span className="text-xs font-black text-amber-500 uppercase tracking-wider">Dò:</span>
                 <div className="flex flex-wrap gap-1">
                   {card.products.filter(p => p.tag === 'Dò').map(p => {
-                    const prodName = products.find(prod => prod.id === p.productId)?.name || 'Unknown';
-                    return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{prodName}</span>;
+                    const product = products.find(prod => prod.id === p.productId);
+                    const prodName = product?.name || 'Unknown';
+                    const brandName = product?.brandId ? products.find(b => b.id === product.brandId)?.name : '';
+                    const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
+                    return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{displayName}</span>;
                   })}
                 </div>
               </div>
@@ -240,8 +243,11 @@ export default function Card({
                 <span className="text-xs font-black text-emerald-500 uppercase tracking-wider">Dò xong:</span>
                 <div className="flex flex-wrap gap-1">
                   {card.products.filter(p => p.tag === 'Dò xong').map(p => {
-                    const prodName = products.find(prod => prod.id === p.productId)?.name || 'Unknown';
-                    return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{prodName}</span>;
+                    const product = products.find(prod => prod.id === p.productId);
+                    const prodName = product?.name || 'Unknown';
+                    const brandName = product?.brandId ? products.find(b => b.id === product.brandId)?.name : '';
+                    const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
+                    return <span key={p.productId} className="px-2 py-1 bg-white border border-pastel-border/50 rounded-lg text-xs font-bold text-slate-700">{displayName}</span>;
                   })}
                 </div>
               </div>
@@ -279,7 +285,7 @@ export default function Card({
                     <span 
                       key={tag} 
                       className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] uppercase font-black border",
+                        "px-2.5 py-1 rounded-full text-[10px] font-black border",
                         colors.bg, colors.text, colors.border
                       )}
                     >
@@ -298,6 +304,18 @@ export default function Card({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {card.tags.includes("Xếp lịch") && (
+                <button 
+                  onClick={() => {
+                    const newTags = card.tags.filter(t => t !== "Xếp lịch");
+                    const newNote = card.note.replace(/🔔 Hẹn: .*\n?/, '').trim();
+                    updateCard(card.id, { tags: newTags, note: newNote });
+                  }}
+                  className="px-4 py-2.5 rounded-2xl bg-amber-500 text-white font-bold text-xs active:scale-95 min-h-[40px]"
+                >
+                  Đã qua
+                </button>
+              )}
               {card.tabId === 1 && (
                 <>
                   <button 
@@ -327,9 +345,9 @@ export default function Card({
               {card.tabId !== 1 && card.tabId !== 2 && card.tabId !== 6 && (
                 <button 
                   onClick={() => onMove(6)}
-                  className="px-4 py-2.5 rounded-2xl bg-rose-50 text-rose-500 font-bold text-xs border border-rose-100 active:scale-95 min-h-[40px]"
+                  className="px-4 py-2.5 rounded-2xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 min-h-[40px]"
                 >
-                  Xong
+                  {card.tabId === 5 ? "Đã kiểm tra" : "Xong"}
                 </button>
               )}
               {isDone && (

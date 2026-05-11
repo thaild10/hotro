@@ -176,7 +176,7 @@ export default function CustomerManagementModal({
                       if (e.key === 'Escape') { setEditingId(null); setName(""); setImageUrl(""); }
                     }}
                     autoFocus
-                    className="flex-1 bg-white border-b-2 border-violet-500 px-2 py-2 text-sm font-bold outline-none uppercase"
+                    className="flex-1 bg-white border-b-2 border-violet-500 px-2 py-2 text-sm font-bold outline-none"
                   />
                   <div className="flex items-center gap-1 shrink-0">
                     <button 
@@ -205,7 +205,7 @@ export default function CustomerManagementModal({
                       <User className="w-6 h-6 text-pastel-subtext/30" />
                     )}
                   </div>
-                  <span className="flex-1 font-bold text-sm truncate uppercase">{customer.name}</span>
+                  <span className="flex-1 font-bold text-sm truncate">{customer.name}</span>
                   <div className="flex items-center gap-1 shrink-0">
                     <button 
                       onClick={() => handleEdit(customer)}

@@ -62,6 +62,16 @@ export interface Product {
   brandId: string;
   categoryId: string;
   price?: number;
+  details?: {
+    importPrice?: number;
+    sellingPrice?: number;
+    costPrice?: number;
+    weight?: string;
+    usage?: string;
+    description?: string;
+    strength?: string;
+    daysToUse?: number;
+  };
 }
 
 export interface AppData {
@@ -78,10 +88,11 @@ export const TAB_NAMES: Record<number, string> = {
   0: "Nhắc lịch",
   1: "1. Tư vấn",
   2: "2. Gửi hàng",
-  3: "3. Đã nhận",
+  3: "3. Add/Dò",
   4: "4. Vấn đề",
-  5: "5. Sau Spa/Khám",
+  5: "5. Spa",
   6: "Xong",
+  7: "6. Khám",
 };
 
 export const DEFAULT_TAGS: Record<number, Tag[]> = {
@@ -89,6 +100,7 @@ export const DEFAULT_TAGS: Record<number, Tag[]> = {
   2: [{ text: "Đã gửi" }, { text: "Thiếu hàng" }],
   3: [{ text: "Đang add" }, { text: "Đang dò" }],
   4: [{ text: "Ưu tiên" }],
-  5: [{ text: "Theo dõi" }],
+  5: [{ text: "Theo dõi" }, { text: "Xếp lịch" }],
   6: [],
+  7: [{ text: "Theo dõi" }],
 };
