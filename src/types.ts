@@ -35,17 +35,29 @@ export interface KanbanCard {
   tags: string[];
   logs: string[];
   products?: CardProduct[];
+  images?: string[];
+}
+
+export interface CustomerGroup {
+  id: string;
+  name: string;
 }
 
 export interface Customer {
   id: string;
   name: string;
   imageUrl?: string;
+  groupId?: string;
+  city?: string;
+  district?: string;
+  address?: string;
 }
 
 export interface UserAccount {
   id: string;
   username: string;
+  password?: string;
+  pinCode?: string;
   role: "Admin" | "Nhân viên";
 }
 
@@ -99,15 +111,74 @@ export interface SkinAuditLog {
   timestamp: string;
 }
 
+export interface LedgerAccount {
+  id: string;
+  name: string;
+  accountNumber: string;
+}
+
+export interface LedgerPurpose {
+  id: string;
+  name: string;
+  type: 'Thu' | 'Chi';
+}
+
+export interface LedgerTransaction {
+  id: string;
+  accountId: string;
+  purposeId: string;
+  amount: number;
+  date: string;
+  reason: string;
+  type: 'Thu' | 'Chi';
+  createdAt: number;
+  customerId?: string; // If purpose is "Khách"
+}
+
+export interface LedgerLog {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: string; // "Tạo", "Sửa", "Xóa"
+  targetType: 'Tài khoản' | 'Mục đích' | 'Phiếu Thu' | 'Phiếu Chi' | 'Giao dịch';
+  message: string;
+}
+
 export interface ImageCompressionSettings {
   maxWidth: number;
   quality: number;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone?: string;
+  accountNumber?: string;
+  imageUrl?: string;
+}
+
+export interface ImportItem {
+  productId: string;
+  quantity: number;
+  importPrice: number;
+  subtotal: number;
+}
+
+export interface ImportOrder {
+  id: string;
+  supplierId: string;
+  items: ImportItem[];
+  totalAmount: number;
+  date: string;
+  createdAt: number;
+  transactionId?: string; // Linked "Chi" transaction
 }
 
 export interface AppData {
   cards: KanbanCard[];
   tagsConfig: Record<number, Tag[]>;
   customers?: Customer[];
+  customerGroups?: CustomerGroup[];
   users?: UserAccount[];
   brands?: Brand[];
   productCategories?: ProductCategory[];
@@ -115,6 +186,34 @@ export interface AppData {
   skinAudits?: SkinAuditEntry[];
   skinAuditLogs?: SkinAuditLog[];
   compressionSettings?: ImageCompressionSettings;
+  ledgerAccounts?: LedgerAccount[];
+  ledgerPurposes?: LedgerPurpose[];
+  ledgerTransactions?: LedgerTransaction[];
+  ledgerLogs?: LedgerLog[];
+  orders?: Order[];
+  suppliers?: Supplier[];
+  importOrders?: ImportOrder[];
+}
+
+export interface OrderItem {
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  subtotal: number;
+}
+
+export interface Order {
+  id: string;
+  customerId: string;
+  items: OrderItem[];
+  totalAmount: number;
+  date: string;
+  createdAt: number;
+  city?: string;
+  district?: string;
+  address?: string;
+  transactionId?: string; // Linked "Chi" transaction
 }
 
 export const TAB_NAMES: Record<number, string> = {

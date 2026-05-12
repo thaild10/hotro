@@ -39,9 +39,15 @@ service cloud.firestore {
                (!data.keys().hasAny(['productCategories']) || data.productCategories is list) &&
                (!data.keys().hasAny(['products']) || data.products is list) &&
                (!data.keys().hasAny(['skinAudits']) || data.skinAudits is list) &&
+               (!data.keys().hasAny(['skinAuditLogs']) || data.skinAuditLogs is list) &&
+               (!data.keys().hasAny(['compressionSettings']) || data.compressionSettings is map) &&
+               (!data.keys().hasAny(['ledgerAccounts']) || data.ledgerAccounts is list) &&
+               (!data.keys().hasAny(['ledgerPurposes']) || data.ledgerPurposes is list) &&
+               (!data.keys().hasAny(['ledgerTransactions']) || data.ledgerTransactions is list) &&
+               (!data.keys().hasAny(['ledgerLogs']) || data.ledgerLogs is list) &&
                // Limit array sizes to avoid DoW (Denial of Wallet)
                data.cards.size() <= 1000 &&
-               data.keys().size() <= 15;
+               data.keys().size() <= 20;
       }
 
       allow get: if isOwner(username);

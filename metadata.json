@@ -1,6 +1,6 @@
 {
   "name": "hotro",
-  "description": "Ứng dụng quản lý quy trình chăm sóc khách hàng, tư vấn và theo dõi lịch dò khách chuyên nghiệp.",
+  "description": "Hệ thống quản lý quy trình chăm sóc khách hàng, tư vấn, theo dõi lịch và quản lý thu chi chuyên nghiệp.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

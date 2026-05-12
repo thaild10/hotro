@@ -55,6 +55,30 @@
           "items": {
             "$ref": "#/entities/SkinAuditEntry"
           }
+        },
+        "ledgerAccounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/LedgerAccount"
+          }
+        },
+        "ledgerPurposes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/LedgerPurpose"
+          }
+        },
+        "ledgerTransactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/LedgerTransaction"
+          }
+        },
+        "ledgerLogs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/entities/LedgerLog"
+          }
         }
       },
       "required": ["cards", "tagsConfig"]
@@ -134,6 +158,10 @@
         "logs": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "images": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       }
     },
@@ -158,6 +186,55 @@
         "date": { "type": "string" },
         "createdBy": { "type": "string" },
         "createdAt": { "type": "string" }
+      }
+    },
+    "LedgerAccount": {
+      "title": "LedgerAccount",
+      "description": "A ledger bank account.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "accountNumber": { "type": "string" }
+      }
+    },
+    "LedgerPurpose": {
+      "title": "LedgerPurpose",
+      "description": "A transaction purpose.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["Thu", "Chi"] }
+      }
+    },
+    "LedgerTransaction": {
+      "title": "LedgerTransaction",
+      "description": "A ledger income or expense record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accountId": { "type": "string" },
+        "purposeId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "reason": { "type": "string" },
+        "type": { "type": "string", "enum": ["Thu", "Chi"] },
+        "createdAt": { "type": "number" },
+        "customerId": { "type": "string" }
+      }
+    },
+    "LedgerLog": {
+      "title": "LedgerLog",
+      "description": "A log for ledger actions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "user": { "type": "string" },
+        "action": { "type": "string" },
+        "targetType": { "type": "string" },
+        "message": { "type": "string" }
       }
     }
   },

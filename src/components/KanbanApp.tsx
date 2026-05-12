@@ -13,10 +13,17 @@ import {
   Users,
   Shield,
   Package,
-  Monitor,
   Smartphone,
-  Stethoscope
+  Stethoscope,
+  Wallet,
+  MoreVertical,
+  ChevronLeft,
+  ShoppingCart,
+  Building,
+  Home,
+  Monitor
 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   cn, 
   getTodayFormatted, 
@@ -30,13 +37,21 @@ import {
   Tag,
   DEFAULT_TAGS,
   Customer,
+  CustomerGroup,
   UserAccount,
   Brand,
   ProductCategory,
   Product,
   SkinAuditEntry,
   SkinAuditLog,
-  ImageCompressionSettings
+  ImageCompressionSettings,
+  LedgerAccount,
+  LedgerPurpose,
+  LedgerTransaction,
+  LedgerLog,
+  Order,
+  Supplier,
+  ImportOrder
 } from "../types";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -53,7 +68,11 @@ import DoctorReplyModal from "./Modals/DoctorReplyModal";
 import AddDoModal from "./Modals/AddDoModal";
 import SkinAuditModal from "./Modals/SkinAuditModal";
 import ImageCompressionModal from "./Modals/ImageCompressionModal";
+import OrderManagementModal from "./Modals/OrderManagementModal";
+import SupplierManagementModal from "./Modals/SupplierManagementModal";
+import ImportManagementModal from "./Modals/ImportManagementModal";
 import { ConfirmDialog } from "./Modals/ConfirmDialog";
+import LedgerModal from "./Modals/LedgerModal";
 
 interface KanbanAppProps {
   username: string;
@@ -65,6 +84,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const [cards, setCards] = useState<KanbanCard[]>(initialData.cards || []);
   const [tagsConfig, setTagsConfig] = useState<Record<number, Tag[]>>(initialData.tagsConfig || DEFAULT_TAGS);
   const [customers, setCustomers] = useState<Customer[]>(initialData.customers || []);
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>(initialData.customerGroups || []);
   const [users, setUsers] = useState<UserAccount[]>(initialData.users || []);
   const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
@@ -76,10 +96,33 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   useEffect(() => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
     setDeviceView(isMobile ? "mobile" : "desktop");
+
+    // Auto-expand/collapse cards on initialization
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Start of today
+
+    setCards(prev => prev.map(card => {
+      const doDate = parseDateString(card.doDate);
+      // If doDate is today or past, expand. Otherwise, collapse.
+      return { ...card, collapsed: doDate > now };
+    }));
   }, []);
 
   // Determine user role
-  const currentUserRole = users.find(u => u.username === username)?.role || "Admin"; // Defaults to Admin if unconfigured
+  const currentUserRole = users.find(u => {
+    const stored = u.username.toLowerCase().trim();
+    const current = username.toLowerCase().trim();
+    
+    // Exact match
+    if (stored === current) return true;
+    
+    // If one has domain and other doesn't
+    const storedPrefix = stored.split('@')[0];
+    const currentPrefix = current.split('@')[0];
+    if (storedPrefix === currentPrefix) return true;
+
+    return false;
+  })?.role || "Admin";
 
   // Modal states
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
@@ -110,6 +153,52 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   );
   const [showSkinAudit, setShowSkinAudit] = useState(false);
   const [showCompressionSettings, setShowCompressionSettings] = useState(false);
+  const [showFeaturesMenu, setShowFeaturesMenu] = useState(false);
+
+  const [ledgerAccounts, setLedgerAccounts] = useState<LedgerAccount[]>(initialData.ledgerAccounts || []);
+  const [ledgerPurposes, setLedgerPurposes] = useState<LedgerPurpose[]>(() => {
+    const saved = initialData.ledgerPurposes || [];
+    const defaults = [
+      { id: 'p-khach', name: 'Khách', type: 'Thu' as const },
+      { id: 'p-chinh-so-du', name: 'Chỉnh số dư', type: 'Thu' as const }
+    ];
+
+    let final = [...saved];
+    // Remove old names and replace with merged ones to ensure IDs are correct
+    final = final.filter(p => !['Khách', 'Chỉnh số dư'].includes(p.name));
+    
+    defaults.forEach(d => {
+      if (!final.find(p => p.name === d.name)) {
+        final.push(d);
+      }
+    });
+
+    return final;
+  });
+
+  const getAugmentedPurposes = (purps: LedgerPurpose[]) => {
+    const defaults = [
+      { id: 'p-khach', name: 'Khách', type: 'Thu' as const },
+      { id: 'p-chinh-so-du', name: 'Chỉnh số dư', type: 'Thu' as const }
+    ];
+    let final = [...(purps || [])];
+    final = final.filter(p => !['Khách', 'Chỉnh số dư'].includes(p.name));
+    defaults.forEach(d => {
+      if (!final.find(p => p.name === d.name)) {
+        final.push(d);
+      }
+    });
+    return final;
+  };
+  const [ledgerTransactions, setLedgerTransactions] = useState<LedgerTransaction[]>(initialData.ledgerTransactions || []);
+  const [ledgerLogs, setLedgerLogs] = useState<LedgerLog[]>(initialData.ledgerLogs || []);
+  const [orders, setOrders] = useState<Order[]>(initialData.orders || []);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialData.suppliers || []);
+  const [importOrders, setImportOrders] = useState<ImportOrder[]>(initialData.importOrders || []);
+  const [showLedger, setShowLedger] = useState(false);
+  const [showOrderManagement, setShowOrderManagement] = useState(false);
+  const [currentView, setCurrentView] = useState<'kanban' | 'ledger' | 'orders' | 'suppliers' | 'imports'>('kanban');
+  const [debtHistoryCustomerId, setDebtHistoryCustomerId] = useState<string | null>(null);
 
   const prevBrandsRef = useRef(brands);
   const prevProductCategoriesRef = useRef(productCategories);
@@ -124,6 +213,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const serverBrands = initialData.brands || [];
     const serverProductCategories = initialData.productCategories || [];
     const serverProducts = initialData.products || [];
+    const serverCustomerGroups = initialData.customerGroups || [];
     const serverSkinAudits = initialData.skinAudits || [];
     const serverSkinAuditLogs = initialData.skinAuditLogs || [];
     const serverCompressionSettings = initialData.compressionSettings || { maxWidth: 1200, quality: 80 };
@@ -137,12 +227,37 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const brandsMatch = JSON.stringify(serverBrands) === JSON.stringify(brands);
       const categoriesMatch = JSON.stringify(serverProductCategories) === JSON.stringify(productCategories);
       const productsMatch = JSON.stringify(serverProducts) === JSON.stringify(products);
+      const groupsMatch = JSON.stringify(serverCustomerGroups) === JSON.stringify(customerGroups);
       const skinAuditsMatch = JSON.stringify(serverSkinAudits) === JSON.stringify(skinAudits);
       const skinAuditLogsMatch = JSON.stringify(serverSkinAuditLogs) === JSON.stringify(skinAuditLogs);
       const compressionSettingsMatch = JSON.stringify(serverCompressionSettings) === JSON.stringify(compressionSettings);
+      
+      const serverLedgerAccounts = initialData.ledgerAccounts || [];
+      const serverLedgerPurposes = getAugmentedPurposes(initialData.ledgerPurposes || []);
+      const serverLedgerTransactions = initialData.ledgerTransactions || [];
+      const serverLedgerLogs = initialData.ledgerLogs || [];
+      const serverOrders = initialData.orders || [];
+      const serverSuppliers = initialData.suppliers || [];
+      const serverImportOrders = initialData.importOrders || [];
+
+      const ledgerAccountsMatch = JSON.stringify(serverLedgerAccounts) === JSON.stringify(ledgerAccounts);
+      const ledgerPurposesMatch = JSON.stringify(serverLedgerPurposes) === JSON.stringify(ledgerPurposes);
+      const ledgerTransactionsMatch = JSON.stringify(serverLedgerTransactions) === JSON.stringify(ledgerTransactions);
+      const ledgerLogsMatch = JSON.stringify(serverLedgerLogs) === JSON.stringify(ledgerLogs);
+      const ordersMatch = JSON.stringify(serverOrders) === JSON.stringify(orders);
+      const suppliersMatch = JSON.stringify(serverSuppliers) === JSON.stringify(suppliers);
+      const importOrdersMatch = JSON.stringify(serverImportOrders) === JSON.stringify(importOrders);
 
       if (!cardsMatch) {
-        setCards(serverCards);
+        const today = parseDateString(getTodayFormatted()).getTime();
+        const processedCards = serverCards.map(c => {
+          const cardDate = c.doDate ? parseDateString(c.doDate).getTime() : null;
+          const isTodayOrOverdue = cardDate !== null && cardDate <= today;
+          // Apply collapse logic: open if today/overdue, else follow default/stored
+          // Actually user says "mặc định đóng. Trừ khi... thì mở"
+          return { ...c, collapsed: isTodayOrOverdue ? false : true };
+        });
+        setCards(processedCards);
         prevCardsRef.current = serverCards;
       }
       if (!tagsMatch) {
@@ -169,6 +284,9 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         setProducts(serverProducts);
         prevProductsRef.current = serverProducts;
       }
+      if (!groupsMatch) {
+        setCustomerGroups(serverCustomerGroups);
+      }
       if (!skinAuditsMatch) {
         setSkinAudits(serverSkinAudits);
         prevSkinAuditsRef.current = serverSkinAudits;
@@ -178,6 +296,27 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       }
       if (!compressionSettingsMatch) {
         setCompressionSettings(serverCompressionSettings);
+      }
+      if (!ledgerAccountsMatch) {
+        setLedgerAccounts(serverLedgerAccounts);
+      }
+      if (!ledgerPurposesMatch) {
+        setLedgerPurposes(serverLedgerPurposes);
+      }
+      if (!ledgerTransactionsMatch) {
+        setLedgerTransactions(serverLedgerTransactions);
+      }
+      if (!ledgerLogsMatch) {
+        setLedgerLogs(serverLedgerLogs);
+      }
+      if (!ordersMatch) {
+        setOrders(serverOrders);
+      }
+      if (!suppliersMatch) {
+        setSuppliers(serverSuppliers);
+      }
+      if (!importOrdersMatch) {
+        setImportOrders(serverImportOrders);
       }
     }
   }, [initialData, saveStatus]);
@@ -191,21 +330,45 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const brandsChanged = JSON.stringify(prevBrandsRef.current) !== JSON.stringify(brands);
     const categoriesChanged = JSON.stringify(prevProductCategoriesRef.current) !== JSON.stringify(productCategories);
     const productsChanged = JSON.stringify(prevProductsRef.current) !== JSON.stringify(products);
+    const groupsChanged = JSON.stringify(initialData.customerGroups || []) !== JSON.stringify(customerGroups);
     const skinAuditsChanged = JSON.stringify(prevSkinAuditsRef.current) !== JSON.stringify(skinAudits);
     const skinAuditLogsChanged = JSON.stringify(initialData.skinAuditLogs) !== JSON.stringify(skinAuditLogs);
     const compressionSettingsChanged = JSON.stringify(initialData.compressionSettings) !== JSON.stringify(compressionSettings);
+    const ledgerChanged = 
+      JSON.stringify(initialData.ledgerAccounts || []) !== JSON.stringify(ledgerAccounts) ||
+      JSON.stringify(initialData.ledgerPurposes || []) !== JSON.stringify(ledgerPurposes) ||
+      JSON.stringify(initialData.ledgerTransactions || []) !== JSON.stringify(ledgerTransactions) ||
+      JSON.stringify(initialData.ledgerLogs || []) !== JSON.stringify(ledgerLogs) ||
+      JSON.stringify(initialData.orders || []) !== JSON.stringify(orders) ||
+      JSON.stringify(initialData.suppliers || []) !== JSON.stringify(suppliers) ||
+      JSON.stringify(initialData.importOrders || []) !== JSON.stringify(importOrders);
 
-    const shouldSave = cardsChanged || tagsChanged || customersChanged || usersChanged || brandsChanged || categoriesChanged || productsChanged || skinAuditsChanged || skinAuditLogsChanged || compressionSettingsChanged;
+    const shouldSave = cardsChanged || tagsChanged || customersChanged || usersChanged || brandsChanged || categoriesChanged || productsChanged || skinAuditsChanged || skinAuditLogsChanged || compressionSettingsChanged || ledgerChanged || groupsChanged;
 
     if (shouldSave) {
-      const saveData = async () => {
+      const performSave = async () => {
         setSaveStatus("saving");
         try {
           const docRef = doc(db, "appdata", "shared_kanban");
-          await setDoc(docRef, { 
+          
+          // Deep sanitize utility to handle any undefined values
+          const sanitize = (val: any): any => {
+            if (val === undefined) return null;
+            if (val === null) return null;
+            if (Array.isArray(val)) return val.map(sanitize);
+            if (typeof val === 'object') {
+              const cleaned: any = {};
+              for (const key in val) {
+                cleaned[key] = sanitize(val[key]);
+              }
+              return cleaned;
+            }
+            return val;
+          };
+
+          await setDoc(docRef, sanitize({ 
             cards: cards.map(c => ({
               ...c,
-              // Ensure no undefined values which might cause rule issues
               doneDate: c.doneDate || null,
               collapsed: !!c.collapsed,
               doctorText: c.doctorText || "",
@@ -221,10 +384,18 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             brands,
             productCategories,
             products,
+            customerGroups,
             skinAudits,
             skinAuditLogs,
-            compressionSettings
-          });
+            compressionSettings,
+            ledgerAccounts,
+            ledgerPurposes,
+            ledgerTransactions,
+            ledgerLogs,
+            orders,
+            suppliers,
+            importOrders
+          }));
           setSaveStatus("saved");
           prevCardsRef.current = cards;
           prevTagsRef.current = tagsConfig;
@@ -240,10 +411,10 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         }
       };
 
-      const timer = setTimeout(saveData, 2000); // Increased debounce to 2s
+      const timer = setTimeout(performSave, 2000); 
       return () => clearTimeout(timer);
     }
-  }, [cards, tagsConfig, customers, users, brands, productCategories, products, skinAudits]);
+  }, [initialData, cards, tagsConfig, customers, users, brands, productCategories, products, skinAudits, skinAuditLogs, compressionSettings, customerGroups, ledgerAccounts, ledgerPurposes, ledgerTransactions, ledgerLogs, orders]);
 
   const handleCreateCard = () => {
     setIsCreatingCard(true);
@@ -256,13 +427,13 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const log = `${username} - Tạo thẻ mới tại ${actionName} - ${getTimeFormatted()}`;
     
     const newCard: KanbanCard = {
-      id: `card-${Date.now()}`,
+      id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       tabId: targetTabId,
       name: updates.name || "MỚI",
       note: updates.note || "",
       doDate: updates.doDate || "",
       startDate: getTodayFormatted(),
-      tags: [],
+      tags: updates.tags || [],
       logs: [log],
       collapsed: false,
       doctorText: "",
@@ -270,7 +441,8 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       doctorHidden: false,
       notified: false,
       notifiedTime: "",
-      doneDate: ""
+      doneDate: "",
+      images: updates.images || []
     };
     
     setCards(prev => [newCard, ...prev]);
@@ -278,7 +450,21 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   };
 
   const updateCard = (cardId: string, updates: Partial<KanbanCard>) => {
-    setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...updates } : c));
+    setCards(prev => prev.map(c => {
+      if (c.id !== cardId) return c;
+      
+      const nextCard = { ...c, ...updates };
+      
+      // If doDate changed, re-evaluate collapse logic
+      if (updates.doDate !== undefined) {
+        const today = parseDateString(getTodayFormatted()).getTime();
+        const cardDate = nextCard.doDate ? parseDateString(nextCard.doDate).getTime() : null;
+        const isTodayOrOverdue = cardDate !== null && cardDate <= today;
+        nextCard.collapsed = !isTodayOrOverdue;
+      }
+      
+      return nextCard;
+    }));
   };
 
   const confirmAction = (message: string, action: () => void) => {
@@ -307,12 +493,15 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           logs: [log, ...c.logs]
         };
         
+        const today = parseDateString(getTodayFormatted()).getTime();
+        const cardDate = c.doDate ? parseDateString(c.doDate).getTime() : null;
+        const isTodayOrOverdue = cardDate !== null && cardDate <= today;
+
         if (targetTabId === 7) {
-          updates.collapsed = true;
           updates.doneDate = getTodayFormatted();
-        } else {
-          updates.collapsed = false;
-        }
+        } 
+        
+        updates.collapsed = !isTodayOrOverdue;
         
         return { ...c, ...updates };
       }));
@@ -340,6 +529,10 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           }
         }
 
+        const today = parseDateString(getTodayFormatted()).getTime();
+        const cardDate = c.doDate ? parseDateString(c.doDate).getTime() : null;
+        const isTodayOrOverdue = cardDate !== null && cardDate <= today;
+
         // Remove only the latest "Chuyển sang Xong" log
         let removed = false;
         const newLogs = c.logs.filter(l => {
@@ -353,7 +546,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         return { 
           ...c, 
           tabId: prevTabId, 
-          collapsed: false,
+          collapsed: !isTodayOrOverdue,
           doneDate: "",
           logs: newLogs
         };
@@ -396,383 +589,605 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       list = cards.filter(c => c.tabId === activeTab);
     }
 
-    // Sort by doDate
+    // Sort by startDate descending (latest first)
     return [...list].sort((a, b) => {
-      const dateA = parseDateString(a.doDate);
-      const dateB = parseDateString(b.doDate);
-      return dateA.getTime() - dateB.getTime();
+      const dateA = parseDateString(a.startDate || a.doDate);
+      const dateB = parseDateString(b.startDate || b.doDate);
+      return dateB.getTime() - dateA.getTime();
     });
   }, [cards, activeTab, searchQuery, overdueCards]);
 
+  const addCardLogByCustomer = (customerName: string, action: string) => {
+    const card = cards.find(c => c.name.toLowerCase() === customerName.toLowerCase() && c.tabId !== 7);
+    if (card) {
+      addLog(card.id, action);
+    }
+  };
+
   return (
     <div className={cn(
-      "flex flex-col h-screen overflow-hidden bg-pastel-bg transition-all duration-300 ease-in-out",
-      deviceView === 'mobile' ? "max-w-[430px] mx-auto border-x border-slate-200 shadow-2xl relative" : "w-full"
+      "flex flex-col h-screen overflow-hidden bg-pastel-bg transition-all duration-300 ease-in-out relative",
+      deviceView === 'mobile' ? "max-w-[430px] mx-auto border-x border-slate-200 shadow-2xl" : "w-full"
     )}>
-      {/* Header */}
-      <header className="bg-white px-3 py-3 border-b border-pastel-border shrink-0 shadow-sm flex items-center justify-between gap-3">
+      {/* Search Header Logic adjustment */}
+      <header className="bg-white/80 backdrop-blur-md px-3 py-3 border-b border-rose-100 shrink-0 shadow-sm flex items-center justify-between gap-3 sticky top-0 z-[1100]">
         <div className="flex-1 relative max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-pastel-subtext w-5 h-5" />
-          <input 
-            type="text" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-pastel-bg border-none rounded-2xl py-3 pl-12 pr-4 text-base font-bold focus:ring-2 focus:ring-rose-200 outline-none transition-all" 
-            placeholder="Tìm tên khách..."
-          />
+          {currentView === 'kanban' ? (
+            <>
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-rose-300 w-5 h-5" />
+              <input 
+                type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-rose-50/50 border border-rose-100/50 rounded-2xl py-3 pl-12 pr-12 text-base font-bold text-slate-700 placeholder:text-rose-200 focus:bg-white focus:ring-4 focus:ring-rose-500/5 outline-none transition-all shadow-inner" 
+                placeholder="Tìm tên khách..."
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-rose-300 hover:text-rose-500 p-1 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setCurrentView('kanban')}
+                className="w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all flex items-center justify-center active:scale-95 shadow-sm"
+                title="Quay lại"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <h2 className="text-lg font-black text-slate-800 tracking-tight uppercase">
+                {currentView === 'ledger' && "Thu Chi"}
+                {currentView === 'orders' && "Đơn hàng"}
+                {currentView === 'suppliers' && "Nhà cung cấp"}
+                {currentView === 'imports' && "Nhập hàng"}
+              </h2>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-3 shrink-0 overflow-x-auto no-scrollbar max-w-[65%] sm:max-w-none pb-1 snap-x">
-          <div className={cn(
-            "flex items-center justify-center w-12 h-12 rounded-2xl transition-all mr-2 shrink-0 snap-center",
-            saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-200",
-            saveStatus === "saved" && "bg-teal-50 text-teal-600 border border-teal-200",
-            (saveStatus === "error" || saveStatus === "offline") && "bg-red-50 text-red-500 border border-red-200"
-          )}>
-            {saveStatus === "saving" && <CloudUpload className="w-6 h-6" />}
-            {saveStatus === "saved" && <Cloud className="w-6 h-6" />}
-            {(saveStatus === "error" || saveStatus === "offline") && <CloudOff className="w-6 h-6" />}
-          </div>
-
-          <div className="relative group shrink-0 snap-center">
-            <button 
-              onClick={() => setShowCompressionSettings(true)}
-              className="w-12 h-12 rounded-2xl flex items-center justify-center bg-indigo-50 text-indigo-500 border border-indigo-100 active:scale-95 transition-all"
-            >
-              <CloudUpload className="w-6 h-6" />
-            </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap z-50">
-              Nén ảnh
+        <div className="flex items-center gap-2 shrink-0 md:max-w-none">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar snap-x py-1 px-1 max-w-[120px] xs:max-w-[160px] sm:max-w-none">
+            <div className={cn(
+              "flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl transition-all shrink-0 shadow-sm snap-center",
+              saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-100",
+              saveStatus === "saved" && "bg-emerald-50 text-emerald-500 border border-emerald-100",
+              (saveStatus === "error" || saveStatus === "offline") && "bg-rose-50 text-rose-500 border border-rose-100"
+            )} title="Trạng thái lưu">
+              {saveStatus === "saving" && <CloudUpload className="w-5 h-5" />}
+              {saveStatus === "saved" && <Cloud className="w-5 h-5" />}
+              {(saveStatus === "error" || saveStatus === "offline") && <CloudOff className="w-5 h-5" />}
             </div>
-          </div>
 
-          <div className="relative group shrink-0 snap-center">
             <button 
               onClick={() => setShowSkinAudit(true)}
-              className="w-12 h-12 rounded-2xl flex items-center justify-center bg-teal-50 text-teal-500 border border-teal-100 active:scale-95 transition-all"
+              className="flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl bg-amber-50 text-amber-500 border border-amber-100 active:scale-95 transition-all shadow-sm snap-center"
+              title="Khám da"
             >
-              <Stethoscope className="w-6 h-6" />
+              <Stethoscope className="w-5 h-5" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap z-50">
-              Kiểm da
-            </div>
-          </div>
-          
-          {currentUserRole === 'Admin' && (
-            <>
-              <div className="relative group shrink-0 snap-center">
-                <button 
-                  onClick={() => setShowTagManagement(true)}
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center bg-violet-50 text-violet-500 border border-violet-100 active:scale-95 transition-all"
-                >
-                  <TagIcon className="w-6 h-6" />
-                </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap z-50">
-                  Tag
-                </div>
-              </div>
 
-              <div className="relative group shrink-0 snap-center">
-                <button 
-                  onClick={() => setShowAccountManagement(true)}
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center bg-indigo-50 text-indigo-500 border border-indigo-100 active:scale-95 transition-all"
-                >
-                  <Shield className="w-6 h-6" />
-                </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap z-50">
-                  Tài khoản
-                </div>
-              </div>
+            <button 
+              onClick={() => setCurrentView('orders')}
+              className={cn(
+                "flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl border active:scale-95 transition-all shadow-sm snap-center",
+                currentView === 'orders' ? "bg-rose-500 text-white border-rose-600/10" : "bg-rose-50 text-rose-500 border-rose-100"
+              )}
+              title="Tạo đơn"
+            >
+              <ShoppingCart className="w-5 h-5" />
+            </button>
 
-              <div className="relative group shrink-0 snap-center">
-                <button 
-                  onClick={() => setShowProductManagement(true)}
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center bg-amber-50 text-amber-500 border border-amber-100 active:scale-95 transition-all"
-                >
-                  <Package className="w-6 h-6" />
-                </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap z-50">
-                  Sản phẩm
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="relative group shrink-0 snap-center">
             <button 
               onClick={() => setShowCustomerManagement(true)}
-              className="w-12 h-12 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-500 border border-rose-100 active:scale-95 transition-all"
+              className="flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl bg-violet-50 text-violet-500 border border-violet-100 active:scale-95 transition-all shadow-sm snap-center"
+              title="Khách hàng"
             >
-              <Users className="w-6 h-6" />
+              <Users className="w-5 h-5" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap z-50">
-              Khách hàng
-            </div>
+
+            <button 
+              onClick={() => setCurrentView('ledger')}
+              className={cn(
+                "flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl border active:scale-95 transition-all shadow-sm snap-center",
+                currentView === 'ledger' ? "bg-emerald-500 text-white border-emerald-600" : "bg-emerald-50 text-emerald-500 border-emerald-100"
+              )}
+              title="Thu Chi"
+            >
+              <Wallet className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="relative group shrink-0 snap-center">
+          <div className="relative shrink-0 group">
             <button 
-              onClick={() => setDeviceView(prev => prev === 'desktop' ? 'mobile' : 'desktop')}
-              className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all"
+              onClick={() => setShowFeaturesMenu(prev => !prev)}
+              className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 border shadow-sm",
+                showFeaturesMenu 
+                  ? "bg-slate-800 text-white border-slate-900" 
+                  : "bg-white text-slate-600 border-slate-200 hover:border-rose-200 hover:text-rose-500"
+              )}
+              title="Thêm tính năng"
             >
-              {deviceView === 'desktop' ? <Smartphone className="w-6 h-6" /> : <Monitor className="w-6 h-6 text-rose-400" />}
+              <MoreVertical className="w-5 h-5" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap z-50">
-              {deviceView === 'desktop' ? 'Mobile' : 'Desktop'}
-            </div>
-          </div>
-          
-          <div className="relative group shrink-0 snap-center">
-            <button 
-              onClick={() => confirmAction("Bạn có chắc chắn muốn đăng xuất?", onLogout)}
-              className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100 active:scale-95 transition-all"
-            >
-              <LogOut className="w-6 h-6" />
-            </button>
-            <div className="absolute top-full mt-2 left-1 ml-[-40px] bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all whitespace-nowrap z-50">
-              Đăng xuất
-            </div>
+            {showFeaturesMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-[90]" 
+                  onClick={() => setShowFeaturesMenu(false)}
+                />
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="absolute top-full mt-3 right-0 bg-white border border-rose-100 rounded-3xl shadow-2xl z-[100] min-w-[220px] overflow-hidden p-2 flex flex-col gap-1 ring-8 ring-rose-500/5"
+                >
+                  <div className="px-4 py-2 mb-1">
+                    <span className="text-[10px] font-black text-rose-300 uppercase tracking-[0.2em]">Sản phẩm & Đối tác</span>
+                  </div>
+
+                  {currentUserRole === 'Admin' && (
+                    <>
+                      <button 
+                        onClick={() => { setShowProductManagement(true); setShowFeaturesMenu(false); }}
+                        className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-slate-700 rounded-2xl transition-colors group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center transition-colors group-hover:bg-white text-amber-500">
+                          <Package className="w-4 h-4" />
+                        </div>
+                        Quản lý sản phẩm
+                      </button>
+
+                      <button 
+                        onClick={() => { setCurrentView('suppliers'); setShowFeaturesMenu(false); }}
+                        className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-slate-700 rounded-2xl transition-colors group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center transition-colors group-hover:bg-white text-orange-500">
+                          <Building className="w-4 h-4" />
+                        </div>
+                        Quản lý nhà cung cấp
+                      </button>
+
+                      <button 
+                        onClick={() => { setCurrentView('imports'); setShowFeaturesMenu(false); }}
+                        className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-slate-700 rounded-2xl transition-colors group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center transition-colors group-hover:bg-white text-blue-500">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                        Nhập hàng mới
+                      </button>
+                      <div className="h-px bg-rose-50 mx-2 mb-1 mt-1" />
+                    </>
+                  )}
+
+                  <div className="px-4 py-2 mb-1">
+                    <span className="text-[10px] font-black text-rose-300 uppercase tracking-[0.2em]">Cấu hình hệ thống</span>
+                  </div>
+
+                  {currentUserRole === 'Admin' && (
+                    <button 
+                      onClick={() => { setShowAccountManagement(true); setShowFeaturesMenu(false); }}
+                      className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-slate-700 rounded-2xl transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center transition-colors group-hover:bg-white text-indigo-500">
+                        <Shield className="w-4 h-4" />
+                      </div>
+                      Quản lý tài khoản
+                    </button>
+                  )}
+
+                  <button 
+                    onClick={() => { setShowTagManagement(true); setShowFeaturesMenu(false); }}
+                    className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-slate-700 rounded-2xl transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center transition-colors group-hover:bg-white text-rose-400">
+                      <TagIcon className="w-4 h-4" />
+                    </div>
+                    Cấu hình các Tag
+                  </button>
+
+                  <button 
+                    onClick={() => { setShowCompressionSettings(true); setShowFeaturesMenu(false); }}
+                    className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-slate-700 rounded-2xl transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center transition-colors group-hover:bg-white text-rose-400">
+                      <CloudUpload className="w-4 h-4" />
+                    </div>
+                    Cài đặt nén ảnh
+                  </button>
+
+                  <div className="h-px bg-rose-50 mx-2 mb-1 mt-1" />
+                  
+                  <div className="px-4 py-2 mb-1">
+                    <span className="text-[10px] font-black text-rose-300 uppercase tracking-[0.2em]">Hiển thị</span>
+                  </div>
+
+                  <button 
+                    onClick={() => { setDeviceView(prev => prev === 'desktop' ? 'mobile' : 'desktop'); setShowFeaturesMenu(false); }}
+                    className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-slate-700 rounded-2xl transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center transition-colors group-hover:bg-white">
+                      {deviceView === 'desktop' ? <Smartphone className="w-4 h-4 text-slate-500" /> : <Monitor className="w-4 h-4 text-rose-400" />}
+                    </div>
+                    {deviceView === 'desktop' ? 'Chế độ Mobile' : 'Chế độ Desktop'}
+                  </button>
+
+                  <div className="h-px bg-rose-50 mx-2 mb-1 mt-1" />
+                  <button 
+                    onClick={() => confirmAction("Bạn có chắc chắn muốn đăng xuất?", onLogout)}
+                    className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-rose-500 rounded-2xl transition-colors group"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center transition-colors group-hover:bg-white text-rose-400">
+                      <LogOut className="w-4 h-4" />
+                    </div>
+                    Đăng xuất
+                  </button>
+                </motion.div>
+              </>
+            )}
           </div>
         </div>
       </header>
 
       {/* Tab Bar */}
-      <nav className="bg-white border-b border-pastel-border shrink-0 overflow-x-auto no-scrollbar touch-pan-x">
-        <div className="flex px-3 py-4 gap-6 whitespace-nowrap min-w-max items-center h-[56px]">
-          {Object.entries(TAB_NAMES).map(([id, name]) => {
-            const tabId = parseInt(id);
-            const isActive = activeTab === tabId;
-            return (
-              <button 
-                key={id}
-                onClick={() => setActiveTab(tabId)}
-                className={cn(
-                  "relative text-[15px] font-bold px-2 py-1 transition-all h-full flex items-center",
-                  isActive ? "text-rose-500" : "text-pastel-subtext"
-                )}
-              >
-                {name}
-                {tabId === 0 && (
-                  <span className={cn(
-                    "ml-1.5 flex items-center justify-center text-xs px-2 py-0.5 rounded-full font-black",
-                    isActive ? "bg-rose-100 text-rose-500" : "bg-pastel-bg text-pastel-subtext"
-                  )}>
-                    {overdueCards.length}
-                  </span>
-                )}
-                {isActive && (
-                  <div className="absolute -bottom-1 left-1/4 right-1/4 h-1 bg-rose-400 rounded-full" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Card List */}
-      <main className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-        {filteredCards.length > 0 ? (
-          filteredCards.map((card, index) => (
-            <Card 
-              key={card.id}
-              card={card}
-              customers={customers}
-              products={products}
-              brands={brands}
-              index={index}
-              onEdit={() => setEditingCardId(card.id)}
-              onMove={(tid) => moveCard(card.id, tid)}
-              onMoveBack={() => moveBackFromXong(card.id)}
-              onTagEdit={() => setTagModalCardId(card.id)}
-              onHistory={() => setHistoryCardId(card.id)}
-              onNoteEdit={() => setNoteEditCardId(card.id)}
-              onDoctorReply={() => setDoctorReplyCardId(card.id)}
-              onNotify={() => {
-                confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
-              }}
-              onAddDo={() => setAddDoCardId(card.id)}
-              updateCard={updateCard}
-            />
-          ))
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-pastel-subtext italic">
-            <span className="text-sm">Không có dữ liệu</span>
+      {currentView === 'kanban' && (
+        <nav className="bg-white/50 backdrop-blur-sm border-b border-rose-100 shrink-0 overflow-x-auto no-scrollbar touch-pan-x sticky top-[65px] z-[1000]">
+          <div className="flex px-3 py-3 gap-5 whitespace-nowrap min-w-max items-center h-[52px]">
+            {Object.entries(TAB_NAMES).map(([id, name]) => {
+              const tabId = parseInt(id);
+              const isActive = activeTab === tabId;
+              return (
+                <button 
+                  key={id}
+                  onClick={() => setActiveTab(tabId)}
+                  className={cn(
+                    "relative text-sm font-bold px-3 py-1.5 transition-all rounded-xl",
+                    isActive 
+                      ? "text-rose-600 bg-rose-50" 
+                      : "text-slate-400 hover:text-rose-400 hover:bg-rose-50/30"
+                  )}
+                >
+                  {name}
+                  {tabId === 0 && (
+                    <span className={cn(
+                      "ml-1.5 inline-flex items-center justify-center text-[10px] px-1.5 py-0.5 rounded-lg font-black",
+                      isActive ? "bg-rose-500 text-white" : "bg-rose-100 text-rose-500"
+                    )}>
+                      {overdueCards.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        )}
-      </main>
+        </nav>
+      )}
 
-      {/* Footer Action */}
-      <div className="p-4 shrink-0 bg-white border-t border-pastel-border/50 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <button 
-          onClick={handleCreateCard}
-          className="w-full bg-rose-400 py-4 rounded-[20px] text-white font-black text-base shadow-lg shadow-rose-200/50 flex items-center justify-center gap-2 active:scale-95 transition-transform min-h-[56px]"
-        >
-          <Plus className="w-6 h-6" /> Tạo thẻ mới
-        </button>
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {currentView === 'kanban' ? (
+          <>
+            <main className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+              {filteredCards.length > 0 ? (
+                filteredCards.map((card, index) => (
+                  <Card 
+                    key={card.id}
+                    card={card}
+                    customers={customers}
+                    products={products}
+                    brands={brands}
+                    index={index}
+                    onEdit={() => setEditingCardId(card.id)}
+                    onMove={(tid) => moveCard(card.id, tid)}
+                    onMoveBack={() => moveBackFromXong(card.id)}
+                    onTagEdit={() => setTagModalCardId(card.id)}
+                    onHistory={() => setHistoryCardId(card.id)}
+                    onNoteEdit={() => setNoteEditCardId(card.id)}
+                    onDoctorReply={() => setDoctorReplyCardId(card.id)}
+                    onNotify={() => {
+                      confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
+                    }}
+                    onAddDo={() => setAddDoCardId(card.id)}
+                    updateCard={updateCard}
+                  />
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-pastel-subtext italic">
+                  <span className="text-sm">Không có dữ liệu</span>
+                </div>
+              )}
+            </main>
+
+            {/* Footer Action */}
+            <div className="p-4 shrink-0 bg-white/80 backdrop-blur-md border-t border-rose-100 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sticky bottom-0 z-[1200]">
+              <button 
+                onClick={handleCreateCard}
+                className="w-full bg-rose-400 hover:bg-rose-500 py-4 rounded-2xl text-white font-black text-base shadow-xl shadow-rose-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all min-h-[56px] border border-rose-500/10"
+              >
+                <Plus className="w-6 h-6 stroke-[3]" /> Tạo thẻ mới
+              </button>
+            </div>
+          </>
+        ) : currentView === 'ledger' ? (
+          <LedgerModal 
+            accounts={ledgerAccounts}
+            purposes={ledgerPurposes}
+            transactions={ledgerTransactions}
+            logs={ledgerLogs}
+            customers={customers}
+            username={username}
+            userPassword={users.find(u => {
+              const stored = u.username.toLowerCase().trim();
+              const current = username.toLowerCase().trim();
+              
+              if (stored === current) return true;
+              
+              const storedPrefix = stored.split('@')[0];
+              const currentPrefix = current.split('@')[0];
+              if (storedPrefix === currentPrefix) return true;
+
+              return false;
+            })?.password}
+            onUpdateAccounts={setLedgerAccounts}
+            onUpdatePurposes={setLedgerPurposes}
+            onUpdateTransactions={setLedgerTransactions}
+            onUpdateLogs={setLedgerLogs}
+            onClose={() => {
+              setCurrentView('kanban');
+              setDebtHistoryCustomerId(null);
+            }}
+            onAddCardLog={addCardLogByCustomer}
+            deviceView={deviceView}
+            isPage={true}
+            initialCustomerDebtId={debtHistoryCustomerId}
+          />
+        ) : currentView === 'orders' ? (
+          <OrderManagementModal 
+            orders={orders}
+            customers={customers}
+            products={products}
+            onUpdateOrders={setOrders}
+            onUpdateTransactions={setLedgerTransactions}
+            ledgerTransactions={ledgerTransactions}
+            ledgerPurposes={ledgerPurposes}
+            ledgerAccounts={ledgerAccounts}
+            onUpdateCustomers={setCustomers}
+            customerGroups={customerGroups}
+            onUpdateGroups={setCustomerGroups}
+            onViewDebtHistory={(id) => {
+              setDebtHistoryCustomerId(id);
+              setCurrentView('ledger');
+            }}
+            onAddCardLog={addCardLogByCustomer}
+            compressionSettings={compressionSettings}
+            onClose={() => setCurrentView('kanban')}
+            deviceView={deviceView}
+            isPage={true}
+          />
+        ) : currentView === 'suppliers' ? (
+          <SupplierManagementModal 
+            suppliers={suppliers}
+            onUpdateSuppliers={setSuppliers}
+            onClose={() => setCurrentView('kanban')}
+            deviceView={deviceView}
+            compressionSettings={compressionSettings}
+          />
+        ) : currentView === 'imports' ? (
+          <ImportManagementModal 
+            importOrders={importOrders}
+            suppliers={suppliers}
+            products={products}
+            ledgerTransactions={ledgerTransactions}
+            ledgerPurposes={ledgerPurposes}
+            ledgerAccounts={ledgerAccounts}
+            onUpdateImportOrders={setImportOrders}
+            onUpdateTransactions={setLedgerTransactions}
+            onClose={() => setCurrentView('kanban')}
+            deviceView={deviceView}
+          />
+        ) : null}
       </div>
 
       {/* Modals */}
-      {isCreatingCard && (
-        <CardEditModal 
-          card={{ id: 'temp', name: 'MỚI', tabId: 1, note: '', doDate: '', startDate: '', tags: [], logs: [], collapsed: false, doctorText: '', doctorDate: '', doctorHidden: false, notified: false, notifiedTime: '', doneDate: '' }}
-          customers={customers}
-          onClose={() => setIsCreatingCard(false)}
-          onSave={(updates) => createCardConfirmed(updates)}
-          onDelete={() => setIsCreatingCard(false)}
-        />
-      )}
-
-      {editingCardId && (
-        <CardEditModal 
-          card={cards.find(c => c.id === editingCardId)!}
-          customers={customers}
-          onClose={() => setEditingCardId(null)}
-          onSave={(updates) => {
-            updateCard(editingCardId, updates);
-            setEditingCardId(null);
-          }}
-          onDelete={() => {
-            confirmAction("Bạn có chắc chắn muốn xóa thẻ này?", () => {
-              deleteCard(editingCardId);
+      <AnimatePresence>
+        {isCreatingCard && (
+          <CardEditModal 
+            card={{ id: 'temp', name: 'MỚI', tabId: activeTab === 0 ? 1 : activeTab, note: '', doDate: '', startDate: '', tags: [], logs: [], collapsed: false, doctorText: '', doctorDate: '', doctorHidden: false, notified: false, notifiedTime: '', doneDate: '' }}
+            customers={customers}
+            tagsConfig={tagsConfig}
+            compressionSettings={compressionSettings}
+            onClose={() => setIsCreatingCard(false)}
+            onSave={(updates) => createCardConfirmed(updates)}
+            onDelete={() => setIsCreatingCard(false)}
+          />
+        )}
+ 
+        {editingCardId && (
+          <CardEditModal 
+            card={cards.find(c => c.id === editingCardId)!}
+            customers={customers}
+            tagsConfig={tagsConfig}
+            compressionSettings={compressionSettings}
+            onClose={() => setEditingCardId(null)}
+            onSave={(updates) => {
+              updateCard(editingCardId, updates);
               setEditingCardId(null);
-            });
-          }}
-        />
-      )}
-
-      {showCustomerManagement && (
-        <CustomerManagementModal 
-          customers={customers}
-          onClose={() => setShowCustomerManagement(false)}
-          onUpdateCustomers={(newCustomers) => setCustomers(newCustomers)}
-          compressionSettings={compressionSettings}
-          deviceView={deviceView}
-        />
-      )}
-
-      {tagModalCardId && (
-        <TagSelectionModal 
-          card={cards.find(c => c.id === tagModalCardId)!}
-          tagsConfig={tagsConfig}
-          onClose={() => setTagModalCardId(null)}
-          onUpdateCard={(updates) => {
-            updateCard(tagModalCardId, updates);
-          }}
-        />
-      )}
-
-      {showTagManagement && (
-        <TagManagementModal 
-          tagsConfig={tagsConfig}
-          onClose={() => setShowTagManagement(false)}
-          onUpdateConfig={(newConfig) => {
-            setTagsConfig(newConfig);
-          }}
-          deviceView={deviceView}
-        />
-      )}
-
-      {historyCardId && (
-        <CardHistoryModal 
-          card={cards.find(c => c.id === historyCardId)!}
-          onClose={() => setHistoryCardId(null)}
-        />
-      )}
-
-      {noteEditCardId && (
-        <NoteEditModal 
-          card={cards.find(c => c.id === noteEditCardId)!}
-          onClose={() => setNoteEditCardId(null)}
-          onSave={(newNote) => {
-            updateCard(noteEditCardId, { note: newNote });
-            setNoteEditCardId(null);
-          }}
-        />
-      )}
-
-      {doctorReplyCardId && (
-        <DoctorReplyModal 
-          card={cards.find(c => c.id === doctorReplyCardId)!}
-          onClose={() => setDoctorReplyCardId(null)}
-          onSave={(reply) => {
-            const updates: Partial<KanbanCard> = { 
-              doctorText: reply,
-              doctorDate: getTodayFormatted(),
-              doctorHidden: !reply 
-            };
-            updateCard(doctorReplyCardId, updates);
-            addLog(doctorReplyCardId, "Bác sĩ phản hồi");
-            setDoctorReplyCardId(null);
-          }}
-        />
-      )}
-
-      {showAccountManagement && (
-        <AccountManagementModal 
-          accounts={users}
-          onUpdateAccounts={setUsers}
-          onClose={() => setShowAccountManagement(false)}
-          deviceView={deviceView}
-        />
-      )}
-
-      {showProductManagement && (
-        <ProductManagementModal 
-          brands={brands}
-          categories={productCategories}
-          products={products}
-          onUpdateBrands={setBrands}
-          onUpdateCategories={setProductCategories}
-          onUpdateProducts={setProducts}
-          onClose={() => setShowProductManagement(false)}
-          compressionSettings={compressionSettings}
-          deviceView={deviceView}
-        />
-      )}
-
-      {addDoCardId && (
-        <AddDoModal
-          initialProducts={cards.find(c => c.id === addDoCardId)?.products || []}
-          availableProducts={products}
-          availableBrands={brands}
-          username={username}
-          onSave={(updatedProducts) => {
-            updateCard(addDoCardId, { products: updatedProducts });
-            setAddDoCardId(null);
-          }}
-          onClose={() => setAddDoCardId(null)}
-        />
-      )}
-
-      {showSkinAudit && (
-        <SkinAuditModal 
-          customers={customers}
-          skinAudits={skinAudits}
-          skinAuditLogs={skinAuditLogs}
-          username={username}
-          onUpdateAudits={setSkinAudits}
-          onUpdateLogs={setSkinAuditLogs}
-          onClose={() => setShowSkinAudit(false)}
-          deviceView={deviceView}
-        />
-      )}
-
-      {showCompressionSettings && (
-        <ImageCompressionModal 
-          settings={compressionSettings}
-          onUpdateSettings={setCompressionSettings}
-          onClose={() => setShowCompressionSettings(false)}
-          deviceView={deviceView}
-        />
-      )}
-
-      {confirmConfig && (
-        <ConfirmDialog 
-          message={confirmConfig.message}
-          onConfirm={confirmConfig.action}
-          onCancel={() => setConfirmConfig(null)}
-        />
-      )}
+            }}
+            onDelete={() => {
+              confirmAction("Bạn có chắc chắn muốn xóa thẻ này?", () => {
+                deleteCard(editingCardId);
+                setEditingCardId(null);
+              });
+            }}
+          />
+        )}
+ 
+        {showOrderManagement && (
+          <OrderManagementModal 
+            orders={orders}
+            customers={customers}
+            products={products}
+            onUpdateOrders={setOrders}
+            onUpdateTransactions={setLedgerTransactions}
+            ledgerTransactions={ledgerTransactions}
+            ledgerPurposes={ledgerPurposes}
+            ledgerAccounts={ledgerAccounts}
+            onUpdateCustomers={setCustomers}
+            customerGroups={customerGroups}
+            onUpdateGroups={setCustomerGroups}
+            compressionSettings={compressionSettings}
+            onClose={() => setShowOrderManagement(false)}
+            deviceView={deviceView}
+          />
+        )}
+ 
+        {showCustomerManagement && (
+          <CustomerManagementModal 
+            customers={customers}
+            customerGroups={customerGroups}
+            transactions={ledgerTransactions}
+            onClose={() => setShowCustomerManagement(false)}
+            onUpdateCustomers={(newCustomers) => setCustomers(newCustomers)}
+            onUpdateGroups={setCustomerGroups}
+            onViewDebtHistory={(id) => {
+              setDebtHistoryCustomerId(id);
+              setCurrentView('ledger');
+              setShowCustomerManagement(false);
+            }}
+            compressionSettings={compressionSettings}
+            deviceView={deviceView}
+          />
+        )}
+ 
+        {tagModalCardId && (
+          <TagSelectionModal 
+            card={cards.find(c => c.id === tagModalCardId)!}
+            tagsConfig={tagsConfig}
+            onClose={() => setTagModalCardId(null)}
+            onUpdateCard={(updates) => {
+              updateCard(tagModalCardId, updates);
+            }}
+          />
+        )}
+ 
+        {showTagManagement && (
+          <TagManagementModal 
+            tagsConfig={tagsConfig}
+            onClose={() => setShowTagManagement(false)}
+            onUpdateConfig={(newConfig) => {
+              setTagsConfig(newConfig);
+            }}
+            deviceView={deviceView}
+          />
+        )}
+ 
+        {historyCardId && (
+          <CardHistoryModal 
+            card={cards.find(c => c.id === historyCardId)!}
+            onClose={() => setHistoryCardId(null)}
+          />
+        )}
+ 
+        {noteEditCardId && (
+          <NoteEditModal 
+            card={cards.find(c => c.id === noteEditCardId)!}
+            onClose={() => setNoteEditCardId(null)}
+            onSave={(newNote) => {
+              updateCard(noteEditCardId, { note: newNote });
+              setNoteEditCardId(null);
+            }}
+          />
+        )}
+ 
+        {doctorReplyCardId && (
+          <DoctorReplyModal 
+            card={cards.find(c => c.id === doctorReplyCardId)!}
+            onClose={() => setDoctorReplyCardId(null)}
+            onSave={(reply) => {
+              const updates: Partial<KanbanCard> = { 
+                doctorText: reply,
+                doctorDate: getTodayFormatted(),
+                doctorHidden: !reply 
+              };
+              updateCard(doctorReplyCardId, updates);
+              addLog(doctorReplyCardId, "Bác sĩ phản hồi");
+              setDoctorReplyCardId(null);
+            }}
+          />
+        )}
+ 
+        {showAccountManagement && (
+          <AccountManagementModal 
+            accounts={users}
+            onUpdateAccounts={setUsers}
+            onClose={() => setShowAccountManagement(false)}
+            deviceView={deviceView}
+          />
+        )}
+ 
+        {showProductManagement && (
+          <ProductManagementModal 
+            brands={brands}
+            categories={productCategories}
+            products={products}
+            onUpdateBrands={setBrands}
+            onUpdateCategories={setProductCategories}
+            onUpdateProducts={setProducts}
+            onClose={() => setShowProductManagement(false)}
+            compressionSettings={compressionSettings}
+            deviceView={deviceView}
+          />
+        )}
+ 
+        {addDoCardId && (
+          <AddDoModal
+            initialProducts={cards.find(c => c.id === addDoCardId)?.products || []}
+            availableProducts={products}
+            availableBrands={brands}
+            username={username}
+            onSave={(updatedProducts) => {
+              updateCard(addDoCardId, { products: updatedProducts });
+              setAddDoCardId(null);
+            }}
+            onClose={() => setAddDoCardId(null)}
+          />
+        )}
+ 
+        {showSkinAudit && (
+          <SkinAuditModal 
+            customers={customers}
+            skinAudits={skinAudits}
+            skinAuditLogs={skinAuditLogs}
+            username={username}
+            onUpdateAudits={setSkinAudits}
+            onUpdateLogs={setSkinAuditLogs}
+            onClose={() => setShowSkinAudit(false)}
+            deviceView={deviceView}
+          />
+        )}
+ 
+        {showCompressionSettings && (
+          <ImageCompressionModal 
+            settings={compressionSettings}
+            onUpdateSettings={setCompressionSettings}
+            onClose={() => setShowCompressionSettings(false)}
+            deviceView={deviceView}
+          />
+        )}
+ 
+        {confirmConfig && (
+          <ConfirmDialog 
+            message={confirmConfig.message}
+            onConfirm={confirmConfig.action}
+            onCancel={() => setConfirmConfig(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

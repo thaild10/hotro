@@ -11,7 +11,9 @@ import {
   Notebook,
   X,
   RotateCcw,
-  Plus
+  Plus,
+  Minus,
+  Image as ImageIcon
 } from "lucide-react";
 import { cn, getTodayFormatted, getTimeFormatted } from "../lib/utils";
 import { KanbanCard, TAB_NAMES, Customer, Product, Brand } from "../types";
@@ -98,8 +100,20 @@ export default function Card({
     )}>
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2.5">
-          <span className="w-6 h-6 rounded-full bg-rose-100 text-rose-500 text-xs font-black flex items-center justify-center shrink-0">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <button 
+            onClick={handleToggleCollapse}
+            className={cn(
+              "w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm",
+              isCollapsed 
+                ? "text-rose-500 bg-rose-50 border-rose-100" 
+                : "text-slate-400 bg-slate-50 border-slate-100"
+            )}
+          >
+            {isCollapsed ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+          </button>
+
+          <span className="w-6 h-6 rounded-full bg-slate-800 text-white text-[10px] font-black flex items-center justify-center shrink-0">
             {index + 1}
           </span>
           <div 
@@ -115,44 +129,34 @@ export default function Card({
               <UserIcon className="w-5 h-5 fill-current" />
             )}
           </div>
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0">
             <span 
               onClick={onEdit}
-              className="font-bold text-base tracking-wide truncate max-w-[150px] cursor-pointer hover:text-rose-500 transition-colors"
+              className="font-bold text-base tracking-wide truncate cursor-pointer hover:text-rose-500 transition-colors"
             >
               {card.name}
             </span>
-            <span className="text-[10px] font-bold text-pastel-subtext italic">(ấn vào tên để sửa toàn bộ thẻ)</span>
+            <span className="text-[10px] font-bold text-pastel-subtext italic truncate">(ấn vào tên để sửa thẻ)</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {!isCollapsed && (
-            <>
-              <button 
-                onClick={onDoctorReply} 
-                className={cn(
-                  "text-xs font-black text-violet-500 bg-violet-50 px-4 py-2.5 rounded-2xl flex items-center gap-1.5 border border-violet-100 active:scale-95 transition-all min-h-[40px]",
-                  card.doctorText && !card.doctorHidden && "opacity-40"
-                )}
-              >
-                <Stethoscope className="w-4 h-4 fill-current" /> Bác sĩ phản hồi
-              </button>
-            </>
-          )}
-          {isDone && (
             <button 
-              onClick={handleToggleCollapse}
-              className="text-xs font-black text-teal-600 bg-teal-50 px-4 py-2.5 rounded-2xl border border-teal-200 active:scale-95 transition-all min-h-[40px]"
+              onClick={onDoctorReply} 
+              className={cn(
+                "text-[10px] font-black text-violet-500 bg-violet-50 px-3 py-2 rounded-xl flex items-center gap-1 border border-violet-100 active:scale-95 transition-all",
+                card.doctorText && !card.doctorHidden && "opacity-40"
+              )}
             >
-              {isCollapsed ? "Mở" : "Đóng"}
+              <Stethoscope className="w-3.5 h-3.5 fill-current" /> Bác sĩ
             </button>
           )}
         </div>
       </div>
 
-      {/* Done Summary (when collapsed in Step 6) */}
-      {isDone && isCollapsed && (
+      {/* Summary (when collapsed) */}
+      {isCollapsed && (
         <div className="flex items-center gap-2 text-xs font-black flex-wrap mt-1">
           <span className="flex items-center gap-1 text-pastel-subtext">
             <PlayCircle className="w-3.5 h-3.5" /> Bắt đầu <b>{card.startDate}</b>
@@ -165,7 +169,7 @@ export default function Card({
               </span>
             </>
           )}
-          {card.doneDate && (
+          {card.doneDate && card.tabId === 7 && (
             <>
               <span className="text-pastel-subtext">·</span>
               <span className="flex items-center gap-0.5 text-teal-500">
@@ -222,6 +226,20 @@ export default function Card({
           </div>
         )}
 
+        {card.images && card.images.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {card.images.map((url, idx) => (
+              <div 
+                key={`${url}-${idx}`} 
+                onClick={() => setSelectedImageUrl(url)}
+                className="w-16 h-16 rounded-xl border border-pastel-border overflow-hidden cursor-pointer hover:ring-2 hover:ring-rose-200 transition-all shadow-sm shrink-0"
+              >
+                <img src={url} alt={`card-img-${idx}`} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        )}
+
         {card.products && card.products.length > 0 && (
           <div className="mt-4 bg-slate-50 border border-pastel-border p-3 rounded-2xl flex flex-col gap-3">
             {/* Dò group */}
@@ -239,7 +257,7 @@ export default function Card({
                       const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
                       const dateLabel = p.date ? ` - ${p.date}` : '';
                       return (
-                        <div key={p.productId} className="px-3 py-2 bg-white border border-pastel-border/50 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2">
+                        <div key={`do-${p.productId}-${idx}`} className="px-3 py-2 bg-white border border-pastel-border/50 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2">
                           <span className="w-5 h-5 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg text-[10px]">{idx + 1}</span>
                           <span className="flex-1 truncate">{displayName}{dateLabel}</span>
                         </div>
@@ -263,7 +281,7 @@ export default function Card({
                       const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
                       const dateLabel = p.date ? ` - ${p.date}` : '';
                       return (
-                        <div key={p.productId} className="px-3 py-2 bg-white border border-pastel-border/50 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2">
+                        <div key={`done-${p.productId}-${idx}`} className="px-3 py-2 bg-white border border-pastel-border/50 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2">
                           <span className="w-5 h-5 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg text-[10px]">{idx + 1}</span>
                           <span className="flex-1 truncate">{displayName}{dateLabel}</span>
                         </div>
@@ -299,11 +317,11 @@ export default function Card({
               </div>
 
               <div className="flex gap-2 items-center">
-                {card.tags.map(tag => {
+                {card.tags.map((tag, idx) => {
                   const colors = getTagColors(tag);
                   return (
                     <span 
-                      key={tag} 
+                      key={`${tag}-${idx}`} 
                       className={cn(
                         "px-2.5 py-1 rounded-full text-[10px] font-black border",
                         colors.bg, colors.text, colors.border
@@ -331,7 +349,7 @@ export default function Card({
                     const newNote = card.note.replace(/🔔 Hẹn: .*\n?/, '').trim();
                     updateCard(card.id, { tags: newTags, note: newNote });
                   }}
-                  className="px-4 py-2.5 rounded-2xl bg-amber-500 text-white font-bold text-xs active:scale-95 min-h-[40px]"
+                  className="px-4 py-2 rounded-xl bg-amber-500 text-white font-bold text-xs active:scale-95 transition-all shadow-sm h-9"
                 >
                   Đã qua
                 </button>
@@ -340,13 +358,13 @@ export default function Card({
                 <>
                   <button 
                     onClick={() => onMove(2)}
-                    className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sky-500 font-bold text-xs border border-sky-100 active:scale-95 min-h-[40px]"
+                    className="px-4 py-2 rounded-xl bg-sky-50 text-sky-600 font-bold text-xs border border-sky-100 active:scale-95 transition-all h-9 flex items-center justify-center min-w-[100px]"
                   >
                     Đã thanh toán
                   </button>
                   <button 
                     onClick={() => onMove(6)}
-                    className="px-4 py-2.5 rounded-2xl bg-rose-50 text-rose-500 font-bold text-xs border border-rose-100 active:scale-95 min-h-[40px]"
+                    className="px-4 py-2 rounded-xl bg-orange-50 text-orange-600 font-bold text-xs border border-orange-100 active:scale-95 transition-all h-9 flex items-center justify-center min-w-[100px]"
                   >
                     Không lấy
                   </button>
@@ -356,7 +374,7 @@ export default function Card({
                 <>
                   <button 
                     onClick={() => onMove(3)}
-                    className="px-4 py-2.5 rounded-2xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 min-h-[40px]"
+                    className="px-4 py-2 rounded-xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 transition-all h-9 flex items-center justify-center min-w-[100px]"
                   >
                     Đã nhận
                   </button>
@@ -365,7 +383,7 @@ export default function Card({
               {card.tabId !== 1 && card.tabId !== 2 && card.tabId !== 7 && (
                 <button 
                   onClick={() => onMove(7)}
-                  className="px-4 py-2.5 rounded-2xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 min-h-[40px]"
+                  className="px-4 py-2 rounded-xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 transition-all h-9 flex items-center justify-center min-w-[100px]"
                 >
                   {card.tabId === 5 ? "Đã kiểm tra" : "Xong"}
                 </button>
@@ -373,14 +391,14 @@ export default function Card({
               {isDone && (
                 <button 
                   onClick={onMoveBack}
-                  className="px-4 py-2.5 rounded-2xl bg-slate-50 text-slate-500 font-bold text-xs border border-slate-200 active:scale-95 min-h-[40px] flex items-center gap-1"
+                  className="px-4 py-2 rounded-xl bg-slate-50 text-slate-500 font-bold text-xs border border-slate-200 active:scale-95 transition-all h-9 flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-3.5 h-3.5" /> Quay lại
                 </button>
               )}
               <button 
                 onClick={onHistory}
-                className="text-xs font-bold text-pastel-subtext flex items-center gap-1.5 bg-pastel-bg px-4 py-2.5 rounded-2xl border border-pastel-border/50 active:scale-95 min-h-[40px]"
+                className="px-4 py-2 rounded-xl bg-slate-50 text-slate-400 font-bold text-xs border border-slate-100 active:scale-95 transition-all h-9 flex items-center gap-1.5"
               >
                 <History className="w-4 h-4" /> Lịch sử
               </button>

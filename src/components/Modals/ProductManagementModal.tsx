@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { X, Package, Box, Tags, Plus, Pencil, Trash2, ArrowDownAZ, ArrowUpZA, Save, Image as ImageIcon, CloudUpload } from "lucide-react";
 import { motion } from "motion/react";
 import { Brand, ProductCategory, Product, ImageCompressionSettings } from "../../types";
 import { cn } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { uploadToFirebase } from "../../lib/imageUtils";
+import { Pagination } from "../Pagination";
 
 interface ProductManagementModalProps {
   brands: Brand[];
@@ -161,9 +162,21 @@ function BrandTab({
     });
   };
 
-  const sortedBrands = [...brands].sort((a, b) => {
-    return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const sortedBrands = useMemo(() => {
+    return [...brands].sort((a, b) => {
+      return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+    });
+  }, [brands, sortAsc]);
+
+  const paginatedBrands = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedBrands.slice(start, start + pageSize);
+  }, [sortedBrands, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(brands.length / pageSize);
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -204,10 +217,10 @@ function BrandTab({
           <div className="w-24 text-right">Thao tác</div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {sortedBrands.map((brand, idx) => (
+          {paginatedBrands.map((brand, idx) => (
             <div key={brand.id} className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors">
               <div className="w-12 text-center text-sm font-bold text-pastel-subtext">
-                {idx + 1}
+                {(currentPage - 1) * pageSize + idx + 1}
               </div>
               <div className="flex-1 font-bold text-sm text-slate-700">
                 {editingId === brand.id ? (
@@ -261,12 +274,23 @@ function BrandTab({
               </div>
             </div>
           ))}
-          {sortedBrands.length === 0 && (
+          {brands.length === 0 && (
             <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
               Chưa có hãng nào
             </div>
           )}
         </div>
+        
+        {brands.length > 0 && (
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            totalItems={brands.length}
+          />
+        )}
       </div>
     </div>
   );
@@ -309,9 +333,21 @@ function CategoryTab({
     });
   };
 
-  const sortedCategories = [...categories].sort((a, b) => {
-    return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+    });
+  }, [categories, sortAsc]);
+
+  const paginatedCategories = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedCategories.slice(start, start + pageSize);
+  }, [sortedCategories, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(categories.length / pageSize);
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -352,10 +388,10 @@ function CategoryTab({
           <div className="w-24 text-right">Thao tác</div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {sortedCategories.map((category, idx) => (
+          {paginatedCategories.map((category, idx) => (
             <div key={category.id} className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors">
               <div className="w-12 text-center text-sm font-bold text-pastel-subtext">
-                {idx + 1}
+                {(currentPage - 1) * pageSize + idx + 1}
               </div>
               <div className="flex-1 font-bold text-sm text-slate-700">
                 {editingId === category.id ? (
@@ -409,12 +445,23 @@ function CategoryTab({
               </div>
             </div>
           ))}
-          {sortedCategories.length === 0 && (
+          {categories.length === 0 && (
             <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
               Chưa có loại sản phẩm nào
             </div>
           )}
         </div>
+        
+        {categories.length > 0 && (
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            totalItems={categories.length}
+          />
+        )}
       </div>
     </div>
   );
@@ -546,9 +593,21 @@ function ProductTab({
     });
   };
 
-  const sortedProducts = [...products].sort((a, b) => {
-    return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-  });
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+    });
+  }, [products, sortAsc]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedProducts.slice(start, start + pageSize);
+  }, [sortedProducts, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(products.length / pageSize);
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -747,7 +806,7 @@ function ProductTab({
           <div className="w-24 text-right">Thao tác</div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {sortedProducts.map((product, idx) => {
+          {paginatedProducts.map((product, idx) => {
             const brand = brands.find(b => b.id === product.brandId);
             const category = categories.find(c => c.id === product.categoryId);
             const isDetailed = product.details && Object.values(product.details).every(v => v !== undefined && v !== "");
@@ -757,7 +816,7 @@ function ProductTab({
               <div key={product.id} className="flex flex-col border-b border-pastel-border/30 last:border-0">
                 <div className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors">
                   <div className="w-10 text-center text-sm font-bold text-pastel-subtext">
-                    {idx + 1}
+                    {(currentPage - 1) * pageSize + idx + 1}
                   </div>
                   <div className="flex-1 font-bold text-sm text-slate-700 pr-2">
                     {editingId === product.id ? (
@@ -869,12 +928,23 @@ function ProductTab({
               </div>
             );
           })}
-          {sortedProducts.length === 0 && (
+          {products.length === 0 && (
             <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
               Chưa có sản phẩm nào
             </div>
           )}
         </div>
+        
+        {products.length > 0 && (
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            totalItems={products.length}
+          />
+        )}
       </div>
     </div>
   );

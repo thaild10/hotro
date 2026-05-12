@@ -3,6 +3,7 @@ import { X, Search, Calendar, History, ArrowDownAZ, ArrowUpZA, Pencil, Trash2, S
 import { motion, AnimatePresence } from "motion/react";
 import { Customer, SkinAuditEntry, SkinAuditLog } from "../../types";
 import { cn, getTodayFormatted, getTimeFormatted } from "../../lib/utils";
+import { Pagination } from "../Pagination";
 
 interface SkinAuditModalProps {
   customers: Customer[];
@@ -74,6 +75,16 @@ export default function SkinAuditModal({
 
     return list;
   }, [customers, search, sortType, skinAudits, currentMonth]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedCustomers.slice(start, start + pageSize);
+  }, [sortedCustomers, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(sortedCustomers.length / pageSize);
 
   const handleAction = (customerId: string, month: string, type: 'Khám' | 'Kiểm tra', date: string) => {
     const newEntry: SkinAuditEntry = {
@@ -229,10 +240,10 @@ export default function SkinAuditModal({
 
           {/* Table Body */}
           <div className="flex-1 overflow-y-auto no-scrollbar">
-            {sortedCustomers.map((customer, idx) => {
+            {paginatedCustomers.map((customer, idx) => {
               return (
                 <div key={customer.id} className="flex items-center px-4 py-4 border-b border-pastel-border/30 hover:bg-pastel-bg/20 transition-colors">
-                  <div className="w-10 text-center text-xs font-black text-pastel-subtext">{idx + 1}</div>
+                  <div className="w-10 text-center text-xs font-black text-pastel-subtext">{(currentPage - 1) * pageSize + idx + 1}</div>
                   <div className="flex-1 px-4">
                     <div className="font-black text-slate-700 text-sm">{customer.name}</div>
                   </div>
@@ -305,6 +316,17 @@ export default function SkinAuditModal({
               );
             })}
           </div>
+          
+          {sortedCustomers.length > 0 && (
+            <Pagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              totalItems={sortedCustomers.length}
+            />
+          )}
         </div>
       </div>
 

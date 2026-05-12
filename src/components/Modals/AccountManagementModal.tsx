@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { User, Shield, Users, Pencil, Trash2, Plus, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserAccount } from "../../types";
 import { cn } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { Pagination } from "../Pagination";
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import firebaseConfig from "../../../firebase-applet-config.json";
@@ -23,11 +24,23 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const paginatedAccounts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return accounts.slice(start, start + pageSize);
+  }, [accounts, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(accounts.length / pageSize);
+
   const handleCreateOrUpdate = async () => {
     if (!username.trim()) return;
+
     
     if (editingId) {
-      onUpdateAccounts(accounts.map(a => a.id === editingId ? { ...a, username, role } : a));
+      onUpdateAccounts(accounts.map(a => a.id === editingId ? { ...a, username, role, password: password || a.password } : a));
       setEditingId(null);
       setUsername("");
       setPassword("");
@@ -48,6 +61,7 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
         const newAccount: UserAccount = {
           id: `acc-${Date.now()}`,
           username: username.trim(),
+          password: password,
           role
         };
         onUpdateAccounts([newAccount, ...accounts]);
@@ -180,10 +194,10 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
             <div className="w-24 text-right">Thao tác</div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
-            {accounts.map((acc, idx) => (
+            {paginatedAccounts.map((acc, idx) => (
               <div key={acc.id} className="flex items-center px-4 py-4 hover:bg-pastel-bg/30 border-b border-pastel-border/30 last:border-0 transition-colors">
                 <div className="w-12 text-center text-xs font-black text-pastel-subtext">
-                  {idx + 1}
+                  {(currentPage - 1) * pageSize + idx + 1}
                 </div>
                 <div className="flex-1 font-black text-sm text-slate-700">
                   {acc.username}
@@ -218,6 +232,17 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
                 <Users className="w-8 h-8 opacity-20" />
                 <span>Chưa có thành viên nào</span>
               </div>
+            )}
+            
+            {accounts.length > 0 && (
+              <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                totalItems={accounts.length}
+              />
             )}
           </div>
         </div>
