@@ -606,11 +606,11 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
   return (
     <div className={cn(
-      "flex flex-col h-screen overflow-hidden bg-pastel-bg transition-all duration-300 ease-in-out relative",
+      "flex flex-col h-[100dvh] overflow-hidden bg-pastel-bg transition-all duration-300 ease-in-out relative",
       deviceView === 'mobile' ? "max-w-[430px] mx-auto border-x border-slate-200 shadow-2xl" : "w-full"
     )}>
       {/* Search Header Logic adjustment */}
-      <header className="bg-white/80 backdrop-blur-md px-3 py-3 border-b border-rose-100 shrink-0 shadow-sm flex items-center justify-between gap-3 sticky top-0 z-[1100]">
+      <header className="bg-white/80 backdrop-blur-md px-3 py-3 border-b border-rose-100 shrink-0 shadow-sm flex items-center justify-between gap-3 sticky top-0 z-[1500]">
         <div className="flex-1 relative max-w-md">
           {currentView === 'kanban' ? (
             <>
@@ -718,13 +718,13 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             {showFeaturesMenu && (
               <>
                 <div 
-                  className="fixed inset-0 z-[90]" 
+                  className="fixed inset-0 z-[1600]" 
                   onClick={() => setShowFeaturesMenu(false)}
                 />
                 <motion.div 
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="absolute top-full mt-3 right-0 bg-white border border-rose-100 rounded-3xl shadow-2xl z-[100] min-w-[220px] overflow-hidden p-2 flex flex-col gap-1 ring-8 ring-rose-500/5"
+                  className="absolute top-full mt-3 right-0 bg-white border border-rose-100 rounded-3xl z-[1700] min-w-[220px] max-h-[80vh] overflow-y-auto p-2 flex flex-col gap-1 no-scrollbar border-b-4 border-rose-200"
                 >
                   <div className="px-4 py-2 mb-1">
                     <span className="text-[10px] font-black text-rose-300 uppercase tracking-[0.2em]">Sản phẩm & Đối tác</span>
@@ -872,7 +872,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       <div className="flex-1 overflow-hidden flex flex-col">
         {currentView === 'kanban' ? (
           <>
-            <main className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+            <main className="flex-1 overflow-y-auto p-4 pb-32 space-y-4 no-scrollbar">
               {filteredCards.length > 0 ? (
                 filteredCards.map((card, index) => (
                   <Card 
@@ -904,12 +904,12 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             </main>
 
             {/* Footer Action */}
-            <div className="p-4 shrink-0 bg-white/80 backdrop-blur-md border-t border-rose-100 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sticky bottom-0 z-[1200]">
+            <div className="p-6 shrink-0 bg-transparent pb-[calc(1.5rem+env(safe-area-inset-bottom))] sticky bottom-0 z-[1200] pointer-events-none">
               <button 
                 onClick={handleCreateCard}
-                className="w-full bg-rose-400 hover:bg-rose-500 py-4 rounded-2xl text-white font-black text-base shadow-xl shadow-rose-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all min-h-[56px] border border-rose-500/10"
+                className="w-full bg-rose-400 hover:bg-rose-500 py-4.5 rounded-2xl text-white font-black text-lg shadow-2xl shadow-rose-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all min-h-[64px] pointer-events-auto"
               >
-                <Plus className="w-6 h-6 stroke-[3]" /> Tạo thẻ mới
+                <Plus className="w-7 h-7 stroke-[3]" /> Tạo thẻ mới
               </button>
             </div>
           </>

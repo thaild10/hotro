@@ -139,193 +139,186 @@ export default function SupplierManagementModal({
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row bg-slate-50/50">
-        {/* List Section */}
-        <div className={cn(
-          "flex-1 overflow-y-auto p-6 no-scrollbar",
-          showForm && "hidden lg:block"
-        )}>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {paginatedSuppliers.map(sup => (
-              <div key={sup.id} className="group bg-white border border-pastel-border rounded-[32px] overflow-hidden hover:border-orange-200 hover:shadow-2xl hover:shadow-orange-100/50 transition-all">
-                <div className="aspect-[4/3] bg-pastel-bg relative overflow-hidden group-hover:scale-105 transition-transform duration-500">
-                  {sup.imageUrl ? (
-                    <img src={sup.imageUrl} alt={sup.name} className="w-full h-full object-cover" />
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col no-scrollbar">
+        {/* Create Area Toggle */}
+        {!showForm && (
+          <div className="flex gap-3">
+            <button 
+              onClick={() => setShowForm(true)}
+              className="flex-1 bg-orange-500 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-orange-100 active:scale-95 transition-all flex items-center justify-center gap-2 border border-orange-600/10"
+            >
+              <Plus className="w-5 h-5 stroke-[3]" /> THÊM NHÀ CUNG CẤP MỚI
+            </button>
+          </div>
+        )}
+
+        {/* Create Area Form */}
+        {showForm && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            className="bg-orange-50/50 p-6 rounded-[32px] border border-orange-100 shadow-inner overflow-hidden"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-black text-orange-300 uppercase tracking-widest">
+                {editingId ? "Cập nhật nhà cung cấp" : "Thêm nhà cung cấp mới"}
+              </h3>
+              <button onClick={() => { setShowForm(false); setEditingId(null); setFormState({ name: "", phone: "", accountNumber: "", imageUrl: "" }); }} className="p-2 text-orange-300 hover:text-orange-500 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative group shrink-0">
+                <div 
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
+                  className={cn(
+                    "w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-orange-100 flex items-center justify-center cursor-pointer overflow-hidden hover:border-orange-400 transition-all",
+                    isUploading && "opacity-50 cursor-wait",
+                    formState.imageUrl && "border-solid border-orange-500 shadow-md"
+                  )}
+                >
+                  {formState.imageUrl ? (
+                    <div className="relative w-full h-full">
+                      <img src={formState.imageUrl} alt="preview" className="w-full h-full object-cover" />
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setFormState(prev => ({ ...prev, imageUrl: "" })); }}
+                        className="absolute top-1 right-1 p-1 bg-orange-500 text-white rounded-lg shadow-md hover:scale-110 transition-transform z-10"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-pastel-subtext/20">
-                      <Building className="w-16 h-16" />
-                      <span className="text-[10px] font-black uppercase tracking-widest mt-2">No Image</span>
+                    <div className="flex flex-col items-center gap-1">
+                      <ImageIcon className="w-6 h-6 text-orange-200" />
+                      <span className="text-[8px] font-black text-orange-200 uppercase tracking-tighter">QR / Logo</span>
                     </div>
                   )}
-                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                </div>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleImageUpload} 
+                  className="hidden" 
+                  accept="image/*"
+                />
+              </div>
+              <div className="flex-1 space-y-3">
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input 
+                    type="text" 
+                    value={formState.name}
+                    onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Tên nhà cung cấp..."
+                    className="flex-1 bg-white border border-orange-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-orange-500/5 transition-all shadow-sm"
+                  />
+                  <input 
+                    type="text" 
+                    value={formState.phone}
+                    onChange={(e) => setFormState(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Số điện thoại..."
+                    className="w-full md:w-1/3 bg-white border border-orange-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-orange-500/5 transition-all shadow-sm"
+                  />
+                </div>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input 
+                    type="text" 
+                    value={formState.accountNumber}
+                    onChange={(e) => setFormState(prev => ({ ...prev, accountNumber: e.target.value }))}
+                    placeholder="Số tài khoản / Ngân hàng..."
+                    className="flex-1 bg-white border border-orange-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-orange-500/5 transition-all shadow-sm"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button 
+                    onClick={handleCreateOrUpdate}
+                    className="flex-1 bg-orange-500 text-white py-3 rounded-xl font-black text-xs shadow-xl shadow-orange-100 active:scale-95 transition-all flex items-center justify-center gap-2 border border-orange-600/10"
+                  >
+                    <Save className="w-4 h-4" /> {editingId ? "Cập nhật" : "Lưu đối tác"}
+                  </button>
+                  <button 
+                    onClick={() => { setShowForm(false); setEditingId(null); setFormState({ name: "", phone: "", accountNumber: "", imageUrl: "" }); }}
+                    className="px-6 bg-white border border-orange-100 text-orange-400 rounded-xl font-bold text-xs active:scale-95 transition-all"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* List Area */}
+        <div className="flex-1 bg-white border border-pastel-border rounded-[32px] overflow-hidden flex flex-col shadow-sm">
+          <div className="flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0">
+            <div className="w-10 text-center">STT</div>
+            <div className="flex-1">Thông tin nhà cung cấp</div>
+            <div className="w-32 text-center">Liên hệ</div>
+            <div className="w-24 text-right">Thao tác</div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+            {paginatedSuppliers.map((sup, index) => (
+              <div key={sup.id} className="flex items-center gap-4 p-4 hover:bg-orange-50/20 border-b border-pastel-border/30 last:border-0 transition-colors">
+                <span className="text-xs font-black text-pastel-subtext w-10 text-center">
+                  {(currentPage - 1) * pageSize + index + 1}
+                </span>
+                
+                <div className="flex-1 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-pastel-bg overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+                    {sup.imageUrl ? (
+                      <img src={sup.imageUrl} alt={sup.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Building className="w-6 h-6 text-pastel-subtext/20" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="block font-black text-sm text-slate-700 truncate">{sup.name}</span>
+                    {sup.accountNumber && (
+                      <span className="block text-[10px] text-pastel-subtext font-bold truncate mt-0.5">
+                        TK: {sup.accountNumber}
+                      </span>
+                    )}
+                  </div>
+                  <div className="w-32 text-center">
+                    <span className="text-xs font-bold text-slate-600 block">{sup.phone || "-"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 justify-end w-24">
                     <button 
                       onClick={() => handleEdit(sup)}
-                      className="w-10 h-10 bg-white shadow-xl rounded-xl flex items-center justify-center text-orange-500 hover:bg-orange-500 hover:text-white transition-all transform hover:scale-110"
+                      className="p-2.5 text-orange-500 bg-white border border-orange-100 rounded-xl shadow-sm hover:bg-orange-50 active:scale-90 transition-all"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button 
                       onClick={() => handleDelete(sup.id, sup.name)}
-                      className="w-10 h-10 bg-white shadow-xl rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all transform hover:scale-110"
+                      className="p-2.5 text-rose-500 bg-white border border-rose-100 rounded-xl shadow-sm hover:bg-rose-50 active:scale-90 transition-all"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-                
-                <div className="p-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-600 text-[9px] font-black rounded-lg uppercase">NCC #{sup.id.slice(-4).toUpperCase()}</span>
-                  </div>
-                  <h3 className="font-black text-slate-800 text-lg mb-4 line-clamp-1">{sup.name}</h3>
-                  <div className="space-y-3">
-                    {sup.phone && (
-                      <div className="flex items-center gap-3 text-slate-500">
-                        <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
-                          <Phone className="w-4 h-4" />
-                        </div>
-                        <span className="text-xs font-bold">{sup.phone}</span>
-                      </div>
-                    )}
-                    {sup.accountNumber && (
-                      <div className="flex items-center gap-3 text-slate-500">
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-400">
-                          <ImageIcon className="w-4 h-4" />
-                        </div>
-                        <span className="text-xs font-black truncate">{sup.accountNumber}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             ))}
             {suppliers.length === 0 && (
-              <div className="col-span-full py-32 flex flex-col items-center justify-center text-slate-300 italic gap-4">
-                <div className="w-20 h-20 rounded-[32px] bg-slate-100 flex items-center justify-center">
-                  <Building className="w-10 h-10 opacity-20" />
-                </div>
-                <span className="font-bold">Chưa có nhà cung cấp nào</span>
+              <div className="h-60 flex flex-col items-center justify-center text-pastel-subtext italic text-sm gap-2">
+                <Building className="w-10 h-10 opacity-20" />
+                <span>Chưa có nhà cung cấp nào</span>
               </div>
             )}
+            
+            {suppliers.length > 0 && (
+              <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+                totalItems={suppliers.length}
+              />
+            )}
           </div>
-          
-          {suppliers.length > 0 && (
-            <Pagination 
-              currentPage={currentPage}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={setPageSize}
-              totalItems={suppliers.length}
-            />
-          )}
         </div>
-
-        {/* Form Section */}
-        <AnimatePresence>
-          {showForm && (
-            <motion.div 
-              initial={{ x: 400, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 400, opacity: 0 }}
-              className="w-full lg:w-[450px] bg-white border-l border-pastel-border overflow-y-auto p-10 shadow-2xl relative shrink-0 no-scrollbar"
-            >
-              <button 
-                onClick={() => { setShowForm(false); setEditingId(null); setFormState({ name: "", phone: "", accountNumber: "", imageUrl: "" }); }}
-                className="absolute top-8 right-8 w-12 h-12 rounded-2xl bg-slate-50 border border-pastel-border flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all hover:bg-rose-50 shadow-sm"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <div className="mb-10">
-                <div className="w-16 h-16 rounded-[24px] bg-orange-500 flex items-center justify-center text-white mb-6 shadow-xl shadow-orange-100">
-                  <Plus className="w-8 h-8" />
-                </div>
-                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-                  {editingId ? "Sửa thông tin" : "Thêm đối tác"}
-                </h3>
-                <p className="text-[11px] font-black text-orange-500 uppercase tracking-widest mt-2 bg-orange-50 inline-block px-3 py-1 rounded-full">Thông tin nhà cung cấp</p>
-              </div>
-
-              <div className="space-y-8">
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1">Tên nhà cung cấp</label>
-                  <input 
-                    type="text" 
-                    value={formState.name}
-                    onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full bg-slate-50 border border-pastel-border rounded-2xl p-5 text-sm font-bold outline-none focus:border-orange-500 focus:bg-white shadow-sm transition-all"
-                    placeholder="VD: Công Ty Dược Mỹ Phẩm ABC..."
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1">Số điện thoại</label>
-                  <input 
-                    type="text" 
-                    value={formState.phone}
-                    onChange={(e) => setFormState(prev => ({ ...prev, phone: e.target.value }))}
-                    className="w-full bg-slate-50 border border-pastel-border rounded-2xl p-5 text-sm font-bold outline-none focus:border-orange-500 focus:bg-white shadow-sm transition-all"
-                    placeholder="09xx xxx xxx"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1">Số tài khoản / Ngân hàng</label>
-                  <input 
-                    type="text" 
-                    value={formState.accountNumber}
-                    onChange={(e) => setFormState(prev => ({ ...prev, accountNumber: e.target.value }))}
-                    className="w-full bg-slate-50 border border-pastel-border rounded-2xl p-5 text-sm font-bold outline-none focus:border-orange-500 focus:bg-white shadow-sm transition-all"
-                    placeholder="1903... - Techcombank - NGUYEN VAN A"
-                  />
-                </div>
-
-                {/* Image Upload Block */}
-                <div className="space-y-4">
-                  <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1">Hình ảnh / QR Tài khoản</label>
-                  <div 
-                    onClick={() => !isUploading && fileInputRef.current?.click()}
-                    className={cn(
-                      "w-full aspect-video bg-pastel-bg rounded-[32px] border-2 border-dashed border-pastel-border flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all group relative",
-                      isUploading && "animate-pulse cursor-wait",
-                      formState.imageUrl ? "border-solid border-orange-500" : "hover:border-orange-400 hover:bg-orange-50/30"
-                    )}
-                  >
-                    {formState.imageUrl ? (
-                      <>
-                        <img src={formState.imageUrl} alt="preview" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <CloudUpload className="w-10 h-10 text-white" />
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-14 h-14 rounded-2xl bg-white shadow-lg flex items-center justify-center text-slate-400 group-hover:text-orange-500 transition-colors">
-                          <ImageIcon className="w-7 h-7" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-black text-slate-600">Nhấn để tải ảnh</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">(QR Bank, Thông tin TK...)</p>
-                        </div>
-                      </div>
-                    )}
-                    <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <button 
-                    onClick={handleCreateOrUpdate}
-                    className="w-full bg-orange-500 text-white py-6 rounded-[28px] font-black text-base shadow-2xl shadow-orange-200 flex items-center justify-center gap-3 active:scale-95 transition-all border-b-8 border-orange-700"
-                  >
-                    <Save className="w-6 h-6" /> {editingId ? "CẬP NHẬT ĐỐI TÁC" : "LƯU ĐỐI TÁC MỚI"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {confirmConfig && (

@@ -10,11 +10,11 @@ interface CardHistoryModalProps {
 
 export default function CardHistoryModal({ card, onClose }: CardHistoryModalProps) {
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[80vh]"
+        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[90vh]"
       >
         <div className="flex items-center justify-between mb-4 border-b pb-3 border-pastel-border">
           <div>

@@ -288,30 +288,36 @@ export default function OrderManagementModal({
   };
 
   return (
-    <div className={cn(
-      isPage ? "flex-1 flex flex-col bg-white overflow-hidden p-4" : "fixed inset-0 z-[1100] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4"
-    )}>
-      <motion.div 
-        initial={isPage ? { opacity: 0 } : { y: 20, opacity: 0 }}
-        animate={isPage ? { opacity: 1 } : { y: 0, opacity: 1 }}
-        className={cn(
-          "bg-white w-full shadow-2xl flex flex-col overflow-hidden relative",
-          isPage ? "h-full rounded-[40px] border border-pastel-border shadow-rose-100/20" : "max-w-6xl h-[90vh] rounded-[32px]",
-          deviceView === 'mobile' && !isPage && "h-[95vh]"
-        )}
-      >
-        {/* Header */}
-        <div className="p-6 border-b border-pastel-border flex items-center justify-between bg-pastel-bg/50 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-sky-100 flex items-center justify-center text-sky-600 shadow-sm border border-sky-200">
-              <ShoppingCart className="w-7 h-7" />
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className={cn(
+        "fixed inset-0 z-[2000] bg-white flex flex-col overflow-hidden",
+        deviceView === 'mobile' ? "max-w-[430px] mx-auto shadow-2xl border-x border-slate-200" : "w-full"
+      )}
+    >
+      {/* Header */}
+      <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-pastel-border shrink-0">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onClose}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-colors shrink-0"
+          >
+            ← Trang chủ
+          </button>
+          <div className="h-8 w-[1px] bg-pastel-border/50" />
+            <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100">
+              <ShoppingCart className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Đơn hàng</h2>
-              <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest leading-none mt-1">Quản lý {orders.length} đơn</p>
+              <h2 className="text-lg font-black text-slate-800 leading-tight">Đơn hàng</h2>
+              <p className="text-[9px] font-bold text-sky-500 uppercase tracking-wider">Quản lý bán hàng</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+        </div>
+        <div className="flex items-center gap-2">
             {!showForm && (
               <button 
                 onClick={() => setShowForm(true)}
@@ -320,112 +326,108 @@ export default function OrderManagementModal({
                 <Plus className="w-4 h-4" /> THÊM ĐƠN
               </button>
             )}
-            {!isPage && (
-              <button 
-                onClick={onClose}
-                className="w-10 h-10 rounded-xl bg-white border border-pastel-border hover:bg-rose-50 hover:text-rose-500 transition-all flex items-center justify-center active:scale-90"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            )}
           </div>
-        </div>
+      </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden relative">
-          <div className="h-full overflow-y-auto p-6 no-scrollbar">
-            <table className="w-full text-left border-separate border-spacing-y-3">
-              <thead className="sticky top-0 bg-white z-10">
-                <tr className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest px-4">
-                  <th className="pb-2 pl-4 w-12 text-center">STT</th>
-                  <th className="pb-2">Khách hàng</th>
-                  <th className="pb-2">Sản phẩm</th>
-                  <th className="pb-2">Tiền (Sau ưu đãi)</th>
-                  <th className="pb-2">Ngày</th>
-                  <th className="pb-2 pr-4 text-center">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedOrders.map((order, idx) => {
-                  const customer = customers.find(c => c.id === order.customerId);
-                  return (
-                    <tr key={order.id} className="bg-white hover:bg-sky-50/30 transition-all group">
-                      <td className="py-5 pl-4 rounded-l-2xl border-y border-l border-pastel-border text-center font-black text-pastel-subtext text-xs">
-                        {(currentPage - 1) * pageSize + idx + 1}
-                      </td>
-                      <td className="py-5 border-y border-pastel-border">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-pastel-bg flex items-center justify-center overflow-hidden border border-pastel-border">
-                            {customer?.imageUrl ? <img src={customer.imageUrl} className="w-full h-full object-cover" /> : <UserPlus className="w-5 h-5 text-pastel-subtext/30" />}
-                          </div>
-                          <div>
-                            <span className="block font-black text-sm text-slate-800">{customer?.name || "N/A"}</span>
-                            <span className="block text-[10px] text-pastel-subtext font-bold uppercase truncate max-w-[150px]">
-                              {order.address ? `${order.address}, ${order.district}` : "Chưa có địa chỉ"}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-5 border-y border-pastel-border">
-                        <div className="flex flex-col gap-1">
-                          {order.items.slice(0, 2).map((item, i) => {
-                            const p = products.find(prod => prod.id === item.productId);
-                            return (
-                              <span key={i} className="text-xs font-medium text-slate-600 truncate max-w-[200px]">
-                                • {p?.name} x{item.quantity}
-                              </span>
-                            );
-                          })}
-                          {order.items.length > 2 && (
-                            <span className="text-[10px] font-bold text-sky-500 italic">... và {order.items.length - 2} sản phẩm khác</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-5 border-y border-pastel-border font-black text-sm text-slate-800">
-                        {order.totalAmount.toLocaleString('vi-VN')}
-                      </td>
-                      <td className="py-5 border-y border-pastel-border text-xs font-bold text-pastel-subtext">
-                        {formatIsoToPretty(order.date)}
-                      </td>
-                      <td className="py-5 pr-4 rounded-r-2xl border-y border-r border-pastel-border text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button 
-                            onClick={() => handleEdit(order)}
-                            className="p-2.5 text-sky-500 hover:bg-sky-100 rounded-xl transition-all active:scale-90"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(order.id)}
-                            className="p-2.5 text-rose-500 hover:bg-rose-100 rounded-xl transition-all active:scale-90"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {orders.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-32 text-pastel-subtext">
-                <ShoppingCart className="w-16 h-16 mb-4 opacity-10" />
-                <p className="italic text-sm">Chưa có đơn hàng nào</p>
-              </div>
-            )}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col no-scrollbar">
+          {/* Create Area Toggle */}
+          {!showForm && (
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowForm(true)}
+                className="flex-1 bg-sky-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-sky-100 active:scale-95 transition-all flex items-center justify-center gap-2 border border-sky-700/10"
+              >
+                <Plus className="w-5 h-5 stroke-[3]" /> TẠO ĐƠN HÀNG MỚI
+              </button>
+            </div>
+          )}
+
+          {/* List Area */}
+          <div className="flex-1 bg-white border border-pastel-border rounded-[40px] overflow-hidden flex flex-col shadow-sm">
+            <div className="flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0">
+              <div className="w-10 text-center">STT</div>
+              <div className="flex-1 px-4">Khách hàng / Liên hệ</div>
+              <div className="flex-1">Sản phẩm tiêu biểu</div>
+              <div className="w-32 text-center text-rose-500">Thành tiền</div>
+              <div className="w-24 text-right">Thao tác</div>
+            </div>
             
-            {orders.length > 0 && (
-              <Pagination 
-                currentPage={currentPage}
-                totalPages={totalPages}
-                pageSize={pageSize}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={setPageSize}
-                totalItems={orders.length}
-              />
-            )}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+              {paginatedOrders.map((order, idx) => {
+                const customer = customers.find(c => c.id === order.customerId);
+                return (
+                  <div key={idx} className="flex items-center gap-4 p-4 hover:bg-sky-50/20 border-b border-pastel-border/30 last:border-0 transition-colors">
+                    <span className="text-xs font-black text-pastel-subtext w-10 text-center">
+                      {(currentPage - 1) * pageSize + idx + 1}
+                    </span>
+                    
+                    <div className="flex-1 flex items-center gap-4 px-4 overflow-hidden">
+                      <div className="w-10 h-10 rounded-xl bg-pastel-bg flex items-center justify-center overflow-hidden border border-pastel-border shrink-0">
+                        {customer?.imageUrl ? <img src={customer.imageUrl} className="w-full h-full object-cover" /> : <UserPlus className="w-5 h-5 text-pastel-subtext/20" />}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block font-black text-sm text-slate-700 truncate">{customer?.name || "N/A"}</span>
+                        <span className="block text-[10px] text-pastel-subtext font-bold uppercase truncate">
+                          {order.address ? `${order.address}, ${order.district}` : "Chưa có địa chỉ"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      {order.items.slice(0, 1).map((item, i) => {
+                        const p = products.find(prod => prod.id === item.productId);
+                        return (
+                          <span key={i} className="block text-xs font-bold text-slate-600 truncate">• {p?.name} x{item.quantity}</span>
+                        );
+                      })}
+                      {order.items.length > 1 && (
+                        <span className="block text-[9px] font-black text-sky-500 uppercase tracking-tighter">+{order.items.length - 1} sp khác</span>
+                      )}
+                    </div>
+
+                    <div className="w-32 text-center shrink-0">
+                      <span className="block font-black text-sm text-slate-800">{order.totalAmount.toLocaleString()}đ</span>
+                      <span className="block text-[9px] font-bold text-pastel-subtext">{formatIsoToPretty(order.date)}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 justify-end w-24">
+                      <button 
+                        onClick={() => handleEdit(order)}
+                        className="p-2.5 text-sky-500 bg-white border border-sky-100 rounded-xl shadow-sm hover:bg-sky-50 active:scale-90 transition-all"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(order.id)}
+                        className="p-2.5 text-rose-500 bg-white border border-rose-100 rounded-xl shadow-sm hover:bg-rose-50 active:scale-90 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {orders.length === 0 && (
+                <div className="h-60 flex flex-col items-center justify-center text-pastel-subtext italic text-sm gap-2">
+                  <ShoppingCart className="w-10 h-10 opacity-20" />
+                  <span>Chưa có đơn hàng nào</span>
+                </div>
+              )}
+              
+              {orders.length > 0 && (
+                <Pagination 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                  totalItems={orders.length}
+                />
+              )}
+            </div>
           </div>
+        </div>
 
           {/* Create/Edit Form Overlay */}
           <AnimatePresence>
@@ -720,9 +722,8 @@ export default function OrderManagementModal({
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
 
-        {/* Overlays */}
+          {/* Overlays */}
         {showCustomerModal && (
           <CustomerManagementModal 
             customers={customers}
@@ -745,6 +746,5 @@ export default function OrderManagementModal({
           />
         )}
       </motion.div>
-    </div>
   );
 }

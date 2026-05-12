@@ -462,38 +462,36 @@ export default function LedgerModal({
   };
 
   return (
-    <div className={cn(
-      isPage ? "w-full h-full flex flex-col bg-white overflow-hidden" : "fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4"
-    )}>
-      <motion.div 
-        initial={isPage ? { opacity: 0 } : { y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className={cn(
-          "bg-white w-full flex flex-col overflow-hidden",
-          !isPage && "max-w-5xl h-[85vh] rounded-[32px] shadow-2xl",
-          !isPage && deviceView === 'mobile' && "h-[92vh]",
-          isPage && "h-full"
-        )}
-      >
-        {/* Header - Only show if not a page (KanbanApp shows header in page mode) */}
-        {!isPage && (
-          <div className="p-6 border-b border-pastel-border flex items-center justify-between bg-pastel-bg/50">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className={cn(
+        "fixed inset-0 z-[2000] bg-white flex flex-col overflow-hidden",
+        deviceView === 'mobile' ? "max-w-[430px] mx-auto shadow-2xl border-x border-slate-200" : "w-full"
+      )}
+    >
+      {/* Header */}
+      <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-pastel-border shrink-0">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onClose}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-colors shrink-0"
+          >
+            ← Trang chủ
+          </button>
+          <div className="h-8 w-[1px] bg-pastel-border/50" />
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                <Wallet className="w-7 h-7" />
-              </div>
-              <div>
-                <h2 className="text-xl font-black text-slate-800">Thu Chi</h2>
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
+              <Wallet className="w-5 h-5" />
             </div>
-            <button 
-              onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-white border border-pastel-border hover:bg-rose-50 hover:text-rose-500 transition-all flex items-center justify-center active:scale-90"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div>
+              <h2 className="text-lg font-black text-slate-800 leading-tight">Thu Chi</h2>
+              <p className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">Quản lý tài chính</p>
+            </div>
           </div>
-        )}
+        </div>
+      </div>
 
         {/* Global Tabs */}
         <div className="flex bg-white border-b border-pastel-border p-2 gap-2 shrink-0 overflow-x-auto no-scrollbar">
@@ -1313,6 +1311,5 @@ export default function LedgerModal({
           )}
         </AnimatePresence>
       </motion.div>
-    </div>
-  );
+    );
 }

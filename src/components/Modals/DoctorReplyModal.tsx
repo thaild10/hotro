@@ -13,11 +13,11 @@ export default function DoctorReplyModal({ card, onClose, onSave }: DoctorReplyM
   const [reply, setReply] = useState(card.doctorText || "");
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
+        className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar"
       >
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-2xl bg-violet-100 flex items-center justify-center text-violet-500">
