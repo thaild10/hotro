@@ -5,9 +5,6 @@ import { UserAccount } from "../../types";
 import { cn } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Pagination } from "../Pagination";
-import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import firebaseConfig from "../../../firebase-applet-config.json";
 
 interface AccountManagementModalProps {
   accounts: UserAccount[];
@@ -40,11 +37,25 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
 
     
     if (editingId) {
-      onUpdateAccounts(accounts.map(a => a.id === editingId ? { ...a, username, role, password: password || a.password } : a));
-      setEditingId(null);
-      setUsername("");
-      setPassword("");
-      setRole("Nhân viên");
+      const updatedAccounts = accounts.map(a => a.id === editingId ? { ...a, username, role, password: password || a.password } : a);
+      
+      setLoading(true);
+      try {
+        await fetch("/api/users/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ users: updatedAccounts })
+        });
+        onUpdateAccounts(updatedAccounts);
+        setEditingId(null);
+        setUsername("");
+        setPassword("");
+        setRole("Nhân viên");
+      } catch (err) {
+        alert("Lỗi đồng bộ tài khoản: " + err);
+      } finally {
+        setLoading(false);
+      }
     } else {
       if (!password.trim() || password.length < 6) {
         alert("Vui lòng nhập mật khẩu hợp lệ (ít nhất 6 ký tự) để tạo tài khoản!");
@@ -53,18 +64,23 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
       
       setLoading(true);
       try {
-        const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
-        const secondaryAuth = getAuth(secondaryApp);
-        
-        await createUserWithEmailAndPassword(secondaryAuth, username.trim(), password);
-        
         const newAccount: UserAccount = {
           id: `acc-${Date.now()}`,
           username: username.trim(),
           password: password,
           role
         };
-        onUpdateAccounts([newAccount, ...accounts]);
+        const updatedAccounts = [newAccount, ...accounts];
+
+        const response = await fetch("/api/users/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ users: updatedAccounts })
+        });
+        
+        if (!response.ok) throw new Error("Sync failed");
+
+        onUpdateAccounts(updatedAccounts);
         setUsername("");
         setPassword("");
         setRole("Nhân viên");

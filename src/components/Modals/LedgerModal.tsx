@@ -24,8 +24,6 @@ import {
   Users
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { auth } from "../../firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
 import { 
   LedgerAccount, 
   LedgerPurpose, 
@@ -186,9 +184,12 @@ export default function LedgerModal({
     
     if (!isValid) {
       try {
-        const loginEmail = auth.currentUser?.email || (username.includes('@') ? username : `${username}@app.local`);
-        await signInWithEmailAndPassword(auth, loginEmail, pinValue);
-        isValid = true;
+        const response = await fetch("/api/verify-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password: pinValue })
+        });
+        isValid = response.ok;
       } catch (err) {
         isValid = false;
       }

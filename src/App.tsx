@@ -1,80 +1,56 @@
 import React, { useState, useEffect } from "react";
-import { 
-  onAuthStateChanged, 
-  signOut,
-  User as FirebaseUser
-} from "firebase/auth";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { auth, db } from "./firebase";
 import Login from "./components/Login";
 import KanbanApp from "./components/KanbanApp";
 import { AppData, DEFAULT_TAGS } from "./types";
 
 export default function App() {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [username, setUsername] = useState<string | null>(localStorage.getItem("app_auth_user"));
   const [appData, setAppData] = useState<AppData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Initial load & Polling
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        const storedUsername = localStorage.getItem("app_auth_user");
-        if (storedUsername) {
-          setUsername(storedUsername);
-        }
-      } else {
-        setAppData(null);
-        setUsername(null);
-      }
+    if (!username) {
       setLoading(false);
-    });
+      return;
+    }
 
-    return () => unsubscribeAuth();
-  }, []);
-
-  // Real-time data sync using Firestore
-  useEffect(() => {
-    if (!user) return;
-
-    // Use a shared document for all 3 users
-    const docRef = doc(db, "appdata", "shared_kanban");
-    
-    const unsubscribeData = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setAppData(docSnap.data() as AppData);
-      } else {
-        // Initialize shared data if it doesn't exist
-        const initialData: AppData = {
-          cards: [],
-          tagsConfig: DEFAULT_TAGS,
-        };
-        setDoc(docRef, initialData);
-        setAppData(initialData);
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/data/get");
+        if (!res.ok) throw new Error("Fetch failed");
+        const data = await res.json();
+        if (data) {
+          setAppData(data);
+        } else {
+          setAppData({ cards: [], tagsConfig: DEFAULT_TAGS });
+        }
+      } catch (err) {
+        console.error("Error fetching data:", err);
+      } finally {
+        setLoading(false);
       }
-    }, (error) => {
-      console.error("Error syncing data:", error);
-    });
+    };
 
-    return () => unsubscribeData();
-  }, [user]);
+    fetchData();
+
+    // Polling every 30 seconds for shared updates
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [username]);
 
   const handleLoginSuccess = (newUsername: string) => {
     localStorage.setItem("app_auth_user", newUsername);
     setUsername(newUsername);
-    // Data sync is handled by the useEffect above
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
+  const handleLogout = () => {
     localStorage.removeItem("app_auth_user");
     setUsername(null);
-    setUser(null);
     setAppData(null);
   };
 
-  if (loading || (user && !appData)) {
+  if (loading || (username && !appData)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-pastel-bg">
         <div className="flex flex-col items-center gap-4">
@@ -85,7 +61,7 @@ export default function App() {
     );
   }
 
-  if (!user || !username) {
+  if (!username) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 

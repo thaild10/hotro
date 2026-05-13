@@ -1,5 +1,3 @@
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../firebase";
 
 export interface CompressionSettings {
   maxWidth: number;
@@ -79,17 +77,24 @@ export const uploadToFirebase = async (
     blob = await compressImage(file, settings);
   }
   
-  // Convert directly to base64 Data URL to store in Firestore and avoid Storage blocks
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(blob);
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-      } else {
-        reject(new Error('Failed to read image as base64'));
-      }
-    };
-    reader.onerror = () => reject(new Error('FileReader error during base64 conversion'));
-  });
+  const formData = new FormData();
+  formData.append('image', blob, file.name);
+  formData.append('folder', folder);
+
+  try {
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.url;
+  } catch (error) {
+    console.error("Local upload error:", error);
+    throw error;
+  }
 };

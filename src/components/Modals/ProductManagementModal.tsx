@@ -6,6 +6,7 @@ import { cn } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { uploadToFirebase } from "../../lib/imageUtils";
 import { Pagination } from "../Pagination";
+import ImageCropperModal from "./ImageCropperModal";
 
 interface ProductManagementModalProps {
   brands: Brand[];
@@ -503,24 +504,35 @@ function ProductTab({
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [cropperData, setCropperData] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setIsUploading(true);
-      try {
-        const url = await uploadToFirebase(file, 'products', compressionSettings);
-        setImageUrl(url);
-      } catch (error) {
-        console.error("Upload fail:", error);
-        alert(error instanceof Error ? error.message : "Upload ảnh thất bại, vui lòng thử lại!");
-      } finally {
-        setIsUploading(false);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperData(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleCropComplete = async (blob: Blob) => {
+    setIsUploading(true);
+    setCropperData(null);
+    try {
+      const file = new File([blob], "product.jpg", { type: "image/jpeg" });
+      const url = await uploadToFirebase(file, 'products', compressionSettings);
+      setImageUrl(url);
+    } catch (error) {
+      console.error("Upload fail:", error);
+      alert(error instanceof Error ? error.message : "Upload ảnh thất bại, vui lòng thử lại!");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -822,6 +834,14 @@ function ProductTab({
           )}
         </div>
         
+        {cropperData && (
+          <ImageCropperModal 
+            image={cropperData} 
+            onCropComplete={handleCropComplete} 
+            onCancel={() => setCropperData(null)} 
+          />
+        )}
+
         <div className="flex items-center gap-2">
           <button 
             onClick={() => setSortAsc(!sortAsc)}
@@ -1017,24 +1037,35 @@ function DetailEditor({
   });
   const [imageUrl, setImageUrl] = useState(product.imageUrl || "");
   const [isUploading, setIsUploading] = useState(false);
+  const [cropperData, setCropperData] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setIsUploading(true);
-      try {
-        const url = await uploadToFirebase(file, 'products', compressionSettings);
-        setImageUrl(url);
-      } catch (error) {
-        console.error("Upload fail:", error);
-        alert(error instanceof Error ? error.message : "Upload ảnh thất bại, vui lòng thử lại!");
-      } finally {
-        setIsUploading(false);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperData(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleCropComplete = async (blob: Blob) => {
+    setIsUploading(true);
+    setCropperData(null);
+    try {
+      const file = new File([blob], "product.jpg", { type: "image/jpeg" });
+      const url = await uploadToFirebase(file, 'products', compressionSettings);
+      setImageUrl(url);
+    } catch (error) {
+      console.error("Upload fail:", error);
+      alert(error instanceof Error ? error.message : "Upload ảnh thất bại, vui lòng thử lại!");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -1207,6 +1238,14 @@ function DetailEditor({
           <Save className="w-3.5 h-3.5" /> Lưu chi tiết
         </button>
       </div>
+
+      {cropperData && (
+        <ImageCropperModal 
+          image={cropperData} 
+          onCropComplete={handleCropComplete} 
+          onCancel={() => setCropperData(null)} 
+        />
+      )}
     </div>
   </div>
 );

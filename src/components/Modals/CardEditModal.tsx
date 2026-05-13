@@ -4,6 +4,7 @@ import { KanbanCard, Customer, Tag, ImageCompressionSettings } from "../../types
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../../lib/utils";
 import { uploadToFirebase } from "../../lib/imageUtils";
+import ImageCropperModal from "./ImageCropperModal";
 
 interface CardEditModalProps {
   card: KanbanCard;
@@ -32,6 +33,7 @@ export default function CardEditModal({
   const [error, setError] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [croppingImage, setCroppingImage] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const availableTags = tagsConfig[card.tabId] || [];
@@ -68,18 +70,28 @@ export default function CardEditModal({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      setIsUploading(true);
-      try {
-        const file = files[0];
-        const url = await uploadToFirebase(file, 'kanban', compressionSettings);
-        setImages(prev => [...prev, url]);
-      } catch (err) {
-        console.error("Upload error:", err);
-        alert("Upload ảnh thất bại!");
-      } finally {
-        setIsUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
+      const file = files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCroppingImage(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onCropComplete = async (croppedBlob: Blob) => {
+    setCroppingImage(null);
+    setIsUploading(true);
+    try {
+      const file = new File([croppedBlob], "cropped.jpg", { type: "image/jpeg" });
+      const url = await uploadToFirebase(file, 'kanban', compressionSettings);
+      setImages(prev => [...prev, url]);
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Upload ảnh thất bại!");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -273,6 +285,17 @@ export default function CardEditModal({
             </button>
           )}
         </div>
+
+        {croppingImage && (
+          <ImageCropperModal 
+            image={croppingImage}
+            onCropComplete={onCropComplete}
+            onCancel={() => {
+              setCroppingImage(null);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            }}
+          />
+        )}
       </motion.div>
     </div>
   );

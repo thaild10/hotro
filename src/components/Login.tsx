@@ -6,8 +6,6 @@ import {
   EyeOff, 
   CircleAlert 
 } from "lucide-react";
-import { auth } from "../firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 
@@ -37,13 +35,20 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, loginEmail, password);
-      // Use the username prefix as the display name
-      const displayName = userCredential.user.email?.split('@')[0] || rawInput.split('@')[0];
-      onLoginSuccess(displayName);
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      if (data.success) {
+        onLoginSuccess(data.username);
+      } else {
+        setError(data.message || "Tên đăng nhập hoặc mật khẩu không đúng");
+      }
     } catch (err: any) {
       console.error("Login error:", err);
-      setError("Tên đăng nhập hoặc mật khẩu không đúng");
+      setError("Không thể kết nối đến máy chủ");
     } finally {
       setLoading(false);
     }

@@ -54,8 +54,6 @@ import {
   ImportOrder,
   SkinIssue
 } from "../types";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
 import Card from "./Card";
 import CardEditModal from "./Modals/CardEditModal";
 import TagManagementModal from "./Modals/TagManagementModal";
@@ -222,7 +220,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const serverSkinAuditLogs = initialData.skinAuditLogs || [];
     const serverCompressionSettings = initialData.compressionSettings || { maxWidth: 1200, quality: 80 };
 
-    if (saveStatus === "saved") {
+    if (saveStatus === "idle" || saveStatus === "saved" || saveStatus === "error" || saveStatus === "quota-exceeded") {
       const cardsMatch = JSON.stringify(serverCards) === JSON.stringify(cards);
       const tagsMatch = JSON.stringify(serverTags) === JSON.stringify(tagsConfig);
       const serverCustomers = initialData.customers || [];
@@ -254,15 +252,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const importOrdersMatch = JSON.stringify(serverImportOrders) === JSON.stringify(importOrders);
 
       if (!cardsMatch) {
-        const today = parseDateString(getTodayFormatted()).getTime();
-        const processedCards = serverCards.map(c => {
-          const cardDate = c.doDate ? parseDateString(c.doDate).getTime() : null;
-          const isTodayOrOverdue = cardDate !== null && cardDate <= today;
-          // Apply collapse logic: open if today/overdue, else follow default/stored
-          // Actually user says "mặc định đóng. Trừ khi... thì mở"
-          return { ...c, collapsed: isTodayOrOverdue ? false : true };
-        });
-        setCards(processedCards);
+        setCards(serverCards);
         prevCardsRef.current = serverCards;
       }
       if (!tagsMatch) {
@@ -329,7 +319,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     }
   }, [initialData, saveStatus]);
 
-  // Sync with Firestore
+  // Sync with Backend
   useEffect(() => {
     // Utility to normalize data for stable comparison
     const normalize = (val: any): any => {
@@ -388,19 +378,20 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const performSave = async () => {
         setSaveStatus("saving");
         try {
-          const docRef = doc(db, "appdata", "shared_kanban");
-          await setDoc(docRef, normalizedLocal);
-          setSaveStatus("saved");
+          const response = await fetch("/api/data/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(normalizedLocal)
+          });
           
-          // Clear status after 3 seconds
+          if (!response.ok) throw new Error("Save status not ok");
+          
+          setSaveStatus("saved");
           setTimeout(() => setSaveStatus("idle"), 3000);
         } catch (error: any) {
           console.error("Save error:", error);
-          if (error?.code === 'resource-exhausted' || error?.message?.includes('Quota exceeded')) {
-            setSaveStatus("quota-exceeded");
-          } else {
-            setSaveStatus("error");
-          }
+          setSaveStatus("error");
+          setTimeout(() => setSaveStatus("idle"), 5000);
         }
       };
 

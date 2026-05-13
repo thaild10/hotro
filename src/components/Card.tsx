@@ -91,7 +91,10 @@ export default function Card({
     onNotify();
   };
 
-  const customer = customers.find(c => c.name.toLowerCase() === card.name.toLowerCase());
+  const tags = card.tags || [];
+  const cardProducts = card.products || [];
+  const cardImages = card.images || [];
+  const customer = customers.find(c => (c.name || '').toLowerCase() === (card.name || '').toLowerCase());
 
   return (
     <div className={cn(
@@ -266,9 +269,9 @@ export default function Card({
           );
         })()}
 
-        {card.images && card.images.length > 0 && (
+        {cardImages.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-2">
-            {card.images.map((url, idx) => (
+            {cardImages.map((url, idx) => (
               <div 
                 key={`${url}-${idx}`} 
                 onClick={() => setSelectedImageUrl(url)}
@@ -280,14 +283,14 @@ export default function Card({
           </div>
         )}
 
-        {card.products && card.products.length > 0 && (
+        {cardProducts.length > 0 && (
           <div className="mt-4 bg-slate-50 border border-pastel-border p-3 rounded-2xl flex flex-col gap-3">
             {/* Dò group */}
-            {card.products.filter(p => p.tag === 'Dò').length > 0 && (
+            {cardProducts.filter(p => p.tag === 'Dò').length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider ml-1">Đang Dò:</span>
                 <div className="flex flex-col gap-1">
-                  {card.products
+                  {cardProducts
                     .filter(p => p.tag === 'Dò')
                     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                     .map((p, idx) => {
@@ -307,11 +310,11 @@ export default function Card({
               </div>
             )}
             {/* Dò xong group */}
-            {card.products.filter(p => p.tag === 'Dò xong').length > 0 && (
+            {cardProducts.filter(p => p.tag === 'Dò xong').length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-black text-emerald-500 uppercase tracking-wider ml-1">Dò xong:</span>
                 <div className="flex flex-col gap-1">
-                  {card.products
+                  {cardProducts
                     .filter(p => p.tag === 'Dò xong')
                     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                     .map((p, idx) => {
@@ -357,7 +360,7 @@ export default function Card({
               </div>
 
               <div className="flex gap-2 items-center">
-                {card.tags.map((tag, idx) => {
+                {tags.map((tag, idx) => {
                   const colors = getTagColors(tag);
                   return (
                     <span 
@@ -382,10 +385,10 @@ export default function Card({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {card.tags.includes("Xếp lịch") && (
+              {tags.includes("Xếp lịch") && (
                 <button 
                   onClick={() => {
-                    const newTags = card.tags.filter(t => t !== "Xếp lịch");
+                    const newTags = tags.filter(t => t !== "Xếp lịch");
                     const newNote = card.note.replace(/🔔 Hẹn: .*\n?/, '').trim();
                     updateCard(card.id, { tags: newTags, note: newNote });
                   }}
