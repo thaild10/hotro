@@ -190,11 +190,25 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    // Production: Serve from dist
+    const distPath = path.resolve(__dirname, 'dist');
+    if (fs.existsSync(distPath)) {
+      console.log(`Serving static files from: ${distPath}`);
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        const indexPath = path.join(distPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          res.sendFile(indexPath);
+        } else {
+          res.status(404).send("Production build not found. Please run 'npm run build'.");
+        }
+      });
+    } else {
+      console.warn(`WARNING: dist directory not found at ${distPath}. Using fallback mode.`);
+      app.get('*', (req, res) => {
+        res.status(404).send("Website is under maintenance or dist folder is missing.");
+      });
+    }
   }
 
   app.listen(PORT, "0.0.0.0", () => {

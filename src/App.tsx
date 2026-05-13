@@ -7,6 +7,7 @@ export default function App() {
   const [username, setUsername] = useState<string | null>(localStorage.getItem("app_auth_user"));
   const [appData, setAppData] = useState<AppData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Initial load & Polling
   useEffect(() => {
@@ -18,15 +19,17 @@ export default function App() {
     const fetchData = async () => {
       try {
         const res = await fetch("/api/data/get");
-        if (!res.ok) throw new Error("Fetch failed");
+        if (!res.ok) throw new Error("Không thể kết nối đến máy chủ dữ liệu");
         const data = await res.json();
         if (data) {
           setAppData(data);
         } else {
           setAppData({ cards: [], tagsConfig: DEFAULT_TAGS });
         }
-      } catch (err) {
+        setError(null);
+      } catch (err: any) {
         console.error("Error fetching data:", err);
+        setError(err.message || "Lỗi tải dữ liệu");
       } finally {
         setLoading(false);
       }
@@ -49,6 +52,23 @@ export default function App() {
     setUsername(null);
     setAppData(null);
   };
+
+  if (error && !appData && username) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-rose-50 p-6 text-center">
+        <div className="max-w-md bg-white p-8 rounded-3xl shadow-xl border border-rose-100">
+          <h2 className="text-xl font-black text-rose-500 mb-4">Lỗi Kết Nối Dữ Liệu</h2>
+          <p className="text-slate-600 mb-6">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full bg-rose-500 text-white font-bold py-3 rounded-2xl active:scale-95 transition-all"
+          >
+            Thử tải lại trang
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || (username && !appData)) {
     return (
