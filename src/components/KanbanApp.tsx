@@ -51,10 +51,9 @@ import {
   LedgerLog,
   Order,
   Supplier,
-  ImportOrder
+  ImportOrder,
+  SkinIssue
 } from "../types";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
 import Card from "./Card";
 import CardEditModal from "./Modals/CardEditModal";
 import TagManagementModal from "./Modals/TagManagementModal";
@@ -86,9 +85,10 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const [customers, setCustomers] = useState<Customer[]>(initialData.customers || []);
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>(initialData.customerGroups || []);
   const [users, setUsers] = useState<UserAccount[]>(initialData.users || []);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(1); // Default to "1. Tư vấn" instead of reminders if preferred, but user said keep layout sync.
+  // Tab 0 is reminders
   const [searchQuery, setSearchQuery] = useState("");
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error" | "offline">("saved");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "saving" | "error" | "offline" | "quota-exceeded">("saved");
   const [deviceView, setDeviceView] = useState<"desktop" | "mobile">("desktop");
   const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
 
@@ -143,6 +143,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const prevUsersRef = useRef(users);
 
   const [brands, setBrands] = useState<Brand[]>(initialData.brands || []);
+  const [skinIssues, setSkinIssues] = useState<SkinIssue[]>(initialData.skinIssues || []);
   const [productCategories, setProductCategories] = useState<ProductCategory[]>(initialData.productCategories || []);
   const [products, setProducts] = useState<Product[]>(initialData.products || []);
   const [showProductManagement, setShowProductManagement] = useState(false);
@@ -211,6 +212,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const serverTags = initialData.tagsConfig || DEFAULT_TAGS;
     const serverUsers = initialData.users || [];
     const serverBrands = initialData.brands || [];
+    const serverSkinIssues = initialData.skinIssues || [];
     const serverProductCategories = initialData.productCategories || [];
     const serverProducts = initialData.products || [];
     const serverCustomerGroups = initialData.customerGroups || [];
@@ -225,6 +227,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const customersMatch = JSON.stringify(serverCustomers) === JSON.stringify(customers);
       const usersMatch = JSON.stringify(serverUsers) === JSON.stringify(users);
       const brandsMatch = JSON.stringify(serverBrands) === JSON.stringify(brands);
+      const skinIssuesMatch = JSON.stringify(serverSkinIssues) === JSON.stringify(skinIssues);
       const categoriesMatch = JSON.stringify(serverProductCategories) === JSON.stringify(productCategories);
       const productsMatch = JSON.stringify(serverProducts) === JSON.stringify(products);
       const groupsMatch = JSON.stringify(serverCustomerGroups) === JSON.stringify(customerGroups);
@@ -276,6 +279,9 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         setBrands(serverBrands);
         prevBrandsRef.current = serverBrands;
       }
+      if (!skinIssuesMatch) {
+        setSkinIssues(serverSkinIssues);
+      }
       if (!categoriesMatch) {
         setProductCategories(serverProductCategories);
         prevProductCategoriesRef.current = serverProductCategories;
@@ -323,98 +329,88 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
   // Sync with Firestore
   useEffect(() => {
-    const cardsChanged = JSON.stringify(prevCardsRef.current) !== JSON.stringify(cards);
-    const tagsChanged = JSON.stringify(prevTagsRef.current) !== JSON.stringify(tagsConfig);
-    const customersChanged = JSON.stringify(prevCustomersRef.current) !== JSON.stringify(customers);
-    const usersChanged = JSON.stringify(prevUsersRef.current) !== JSON.stringify(users);
-    const brandsChanged = JSON.stringify(prevBrandsRef.current) !== JSON.stringify(brands);
-    const categoriesChanged = JSON.stringify(prevProductCategoriesRef.current) !== JSON.stringify(productCategories);
-    const productsChanged = JSON.stringify(prevProductsRef.current) !== JSON.stringify(products);
-    const groupsChanged = JSON.stringify(initialData.customerGroups || []) !== JSON.stringify(customerGroups);
-    const skinAuditsChanged = JSON.stringify(prevSkinAuditsRef.current) !== JSON.stringify(skinAudits);
-    const skinAuditLogsChanged = JSON.stringify(initialData.skinAuditLogs) !== JSON.stringify(skinAuditLogs);
-    const compressionSettingsChanged = JSON.stringify(initialData.compressionSettings) !== JSON.stringify(compressionSettings);
-    const ledgerChanged = 
-      JSON.stringify(initialData.ledgerAccounts || []) !== JSON.stringify(ledgerAccounts) ||
-      JSON.stringify(initialData.ledgerPurposes || []) !== JSON.stringify(ledgerPurposes) ||
-      JSON.stringify(initialData.ledgerTransactions || []) !== JSON.stringify(ledgerTransactions) ||
-      JSON.stringify(initialData.ledgerLogs || []) !== JSON.stringify(ledgerLogs) ||
-      JSON.stringify(initialData.orders || []) !== JSON.stringify(orders) ||
-      JSON.stringify(initialData.suppliers || []) !== JSON.stringify(suppliers) ||
-      JSON.stringify(initialData.importOrders || []) !== JSON.stringify(importOrders);
+    // Utility to normalize data for stable comparison
+    const normalize = (val: any): any => {
+      if (val === undefined || val === null) return null;
+      if (Array.isArray(val)) return val.length === 0 ? null : val.map(normalize);
+      if (typeof val === 'object') {
+        const cleaned: any = {};
+        const keys = Object.keys(val).sort();
+        if (keys.length === 0) return null;
+        for (const key of keys) {
+          const v = normalize(val[key]);
+          if (v !== null) cleaned[key] = v;
+        }
+        return Object.keys(cleaned).length === 0 ? null : cleaned;
+      }
+      return val;
+    };
 
-    const shouldSave = cardsChanged || tagsChanged || customersChanged || usersChanged || brandsChanged || categoriesChanged || productsChanged || skinAuditsChanged || skinAuditLogsChanged || compressionSettingsChanged || ledgerChanged || groupsChanged;
+    const localData = {
+      cards: cards.map(c => ({
+        ...c,
+        doneDate: c.doneDate || null,
+        doctorText: c.doctorText || "",
+        doctorDate: c.doctorDate || "",
+        doctorHidden: !!c.doctorHidden,
+        notified: !!c.notified,
+        notifiedTime: c.notifiedTime || "",
+        products: c.products || []
+      })),
+      tagsConfig,
+      customers,
+      users,
+      brands,
+      skinIssues,
+      productCategories,
+      products,
+      customerGroups,
+      skinAudits,
+      skinAuditLogs,
+      compressionSettings,
+      ledgerAccounts,
+      ledgerPurposes,
+      ledgerTransactions,
+      ledgerLogs,
+      orders,
+      suppliers,
+      importOrders
+    };
 
-    if (shouldSave) {
+    const normalizedLocal = normalize(localData);
+    const normalizedRemote = normalize(initialData);
+    
+    const hasChanges = JSON.stringify(normalizedLocal) !== JSON.stringify(normalizedRemote);
+
+    if (hasChanges && saveStatus !== "saving") {
       const performSave = async () => {
         setSaveStatus("saving");
         try {
-          const docRef = doc(db, "appdata", "shared_kanban");
-          
-          // Deep sanitize utility to handle any undefined values
-          const sanitize = (val: any): any => {
-            if (val === undefined) return null;
-            if (val === null) return null;
-            if (Array.isArray(val)) return val.map(sanitize);
-            if (typeof val === 'object') {
-              const cleaned: any = {};
-              for (const key in val) {
-                cleaned[key] = sanitize(val[key]);
-              }
-              return cleaned;
-            }
-            return val;
-          };
-
-          await setDoc(docRef, sanitize({ 
-            cards: cards.map(c => ({
-              ...c,
-              doneDate: c.doneDate || null,
-              collapsed: !!c.collapsed,
-              doctorText: c.doctorText || "",
-              doctorDate: c.doctorDate || "",
-              doctorHidden: !!c.doctorHidden,
-              notified: !!c.notified,
-              notifiedTime: c.notifiedTime || "",
-              products: c.products || []
-            })), 
-            tagsConfig,
-            customers,
-            users,
-            brands,
-            productCategories,
-            products,
-            customerGroups,
-            skinAudits,
-            skinAuditLogs,
-            compressionSettings,
-            ledgerAccounts,
-            ledgerPurposes,
-            ledgerTransactions,
-            ledgerLogs,
-            orders,
-            suppliers,
-            importOrders
-          }));
+          await fetch("/api/data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(normalizedLocal)
+          });
           setSaveStatus("saved");
-          prevCardsRef.current = cards;
-          prevTagsRef.current = tagsConfig;
-          prevCustomersRef.current = customers;
-          prevUsersRef.current = users;
-          prevBrandsRef.current = brands;
-          prevProductCategoriesRef.current = productCategories;
-          prevProductsRef.current = products;
-          prevSkinAuditsRef.current = skinAudits;
-        } catch (error) {
+          
+          // Clear status after 3 seconds
+          setTimeout(() => setSaveStatus("idle"), 3000);
+        } catch (error: any) {
           console.error("Save error:", error);
           setSaveStatus("error");
         }
       };
 
-      const timer = setTimeout(performSave, 2000); 
+      const timer = setTimeout(performSave, 5000); 
       return () => clearTimeout(timer);
     }
-  }, [initialData, cards, tagsConfig, customers, users, brands, productCategories, products, skinAudits, skinAuditLogs, compressionSettings, customerGroups, ledgerAccounts, ledgerPurposes, ledgerTransactions, ledgerLogs, orders]);
+  }, [
+    cards, tagsConfig, customers, users, brands, skinIssues, 
+    productCategories, products, customerGroups, skinAudits, 
+    skinAuditLogs, compressionSettings, ledgerAccounts, 
+    ledgerPurposes, ledgerTransactions, ledgerLogs, orders, 
+    suppliers, importOrders, initialData, saveStatus
+  ]);
 
   const handleCreateCard = () => {
     setIsCreatingCard(true);
@@ -570,6 +566,10 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     return cards.filter(c => c.tabId !== 7 && c.doDate && parseDateString(c.doDate).getTime() <= today);
   }, [cards]);
 
+  const doctorRepliedNotNotifiedCards = useMemo(() => {
+    return cards.filter(c => c.tabId !== 7 && c.doctorText && !c.notified);
+  }, [cards]);
+
   const filteredCards = useMemo(() => {
     let list = cards;
     
@@ -584,7 +584,18 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     }
 
     if (activeTab === 0) {
-      list = overdueCards;
+      // Merge unique by name for reminders
+      const mergedList: KanbanCard[] = [];
+      const seenNames = new Set<string>();
+      
+      [...overdueCards, ...doctorRepliedNotNotifiedCards].forEach(c => {
+        const lowName = c.name.toLowerCase().trim();
+        if (!seenNames.has(lowName)) {
+          seenNames.add(lowName);
+          mergedList.push(c);
+        }
+      });
+      list = mergedList;
     } else {
       list = cards.filter(c => c.tabId === activeTab);
     }
@@ -595,7 +606,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const dateB = parseDateString(b.startDate || b.doDate);
       return dateB.getTime() - dateA.getTime();
     });
-  }, [cards, activeTab, searchQuery, overdueCards]);
+  }, [cards, activeTab, searchQuery, overdueCards, doctorRepliedNotNotifiedCards]);
 
   const addCardLogByCustomer = (customerName: string, action: string) => {
     const card = cards.find(c => c.name.toLowerCase() === customerName.toLowerCase() && c.tabId !== 7);
@@ -656,20 +667,13 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
               "flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl transition-all shrink-0 shadow-sm snap-center",
               saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-100",
               saveStatus === "saved" && "bg-emerald-50 text-emerald-500 border border-emerald-100",
-              (saveStatus === "error" || saveStatus === "offline") && "bg-rose-50 text-rose-500 border border-rose-100"
-            )} title="Trạng thái lưu">
-              {saveStatus === "saving" && <CloudUpload className="w-5 h-5" />}
-              {saveStatus === "saved" && <Cloud className="w-5 h-5" />}
-              {(saveStatus === "error" || saveStatus === "offline") && <CloudOff className="w-5 h-5" />}
+              saveStatus === "idle" && "bg-slate-50 text-slate-400 border border-slate-100",
+              (saveStatus === "error" || saveStatus === "offline" || saveStatus === "quota-exceeded") && "bg-rose-50 text-rose-500 border border-rose-100"
+            )} title={saveStatus === "quota-exceeded" ? "Hết hạn mức Firestore (Reset vào ngày mai)" : "Trạng thái lưu"}>
+              {saveStatus === "saving" && <CloudUpload className="w-5 h-5 animate-pulse" />}
+              {(saveStatus === "saved" || saveStatus === "idle") && <Cloud className="w-5 h-5" />}
+              {(saveStatus === "error" || saveStatus === "offline" || saveStatus === "quota-exceeded") && <CloudOff className="w-5 h-5" />}
             </div>
-
-            <button 
-              onClick={() => setShowSkinAudit(true)}
-              className="flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl bg-amber-50 text-amber-500 border border-amber-100 active:scale-95 transition-all shadow-sm snap-center"
-              title="Khám da"
-            >
-              <Stethoscope className="w-5 h-5" />
-            </button>
 
             <button 
               onClick={() => setCurrentView('orders')}
@@ -724,7 +728,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                 <motion.div 
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="absolute top-full mt-3 right-0 bg-white border border-rose-100 rounded-3xl z-[1700] min-w-[220px] max-h-[80vh] overflow-y-auto p-2 flex flex-col gap-1 no-scrollbar border-b-4 border-rose-200"
+                  className="absolute top-full mt-3 right-0 bg-white border border-rose-100 rounded-3xl z-[1700] min-w-[220px] max-h-[70vh] overflow-y-auto p-2 flex flex-col gap-1 no-scrollbar shadow-xl"
                 >
                   <div className="px-4 py-2 mb-1">
                     <span className="text-[10px] font-black text-rose-300 uppercase tracking-[0.2em]">Sản phẩm & Đối tác</span>
@@ -788,7 +792,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                     <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center transition-colors group-hover:bg-white text-rose-400">
                       <TagIcon className="w-4 h-4" />
                     </div>
-                    Cấu hình các Tag
+                    Quản lý tag
                   </button>
 
                   <button 
@@ -858,7 +862,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                       "ml-1.5 inline-flex items-center justify-center text-[10px] px-1.5 py-0.5 rounded-lg font-black",
                       isActive ? "bg-rose-500 text-white" : "bg-rose-100 text-rose-500"
                     )}>
-                      {overdueCards.length}
+                      {overdueCards.length + doctorRepliedNotNotifiedCards.length}
                     </span>
                   )}
                 </button>
@@ -874,28 +878,121 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           <>
             <main className="flex-1 overflow-y-auto p-4 pb-32 space-y-4 no-scrollbar">
               {filteredCards.length > 0 ? (
-                filteredCards.map((card, index) => (
-                  <Card 
-                    key={card.id}
-                    card={card}
-                    customers={customers}
-                    products={products}
-                    brands={brands}
-                    index={index}
-                    onEdit={() => setEditingCardId(card.id)}
-                    onMove={(tid) => moveCard(card.id, tid)}
-                    onMoveBack={() => moveBackFromXong(card.id)}
-                    onTagEdit={() => setTagModalCardId(card.id)}
-                    onHistory={() => setHistoryCardId(card.id)}
-                    onNoteEdit={() => setNoteEditCardId(card.id)}
-                    onDoctorReply={() => setDoctorReplyCardId(card.id)}
-                    onNotify={() => {
-                      confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
-                    }}
-                    onAddDo={() => setAddDoCardId(card.id)}
-                    updateCard={updateCard}
-                  />
-                ))
+                activeTab === 0 && !searchQuery ? (
+                  <>
+                    {/* Section 1: Overdue/Today */}
+                    {(() => {
+                      const today = getTodayFormatted();
+                      const dueToday = cards.filter(c => c.tabId !== 0 && c.tabId !== 7 && c.doDate <= today);
+                      const mergedDue = [];
+                      const seenDue = new Set();
+                      for (const c of dueToday) {
+                        const lowName = c.name.toLowerCase().trim();
+                        if (!seenDue.has(lowName)) {
+                          seenDue.add(lowName);
+                          mergedDue.push(c);
+                        }
+                      }
+                      if (mergedDue.length === 0) return null;
+                      return (
+                        <div className="space-y-4 mb-8">
+                          <div className="px-3 py-1.5 bg-rose-50 rounded-xl inline-block border border-rose-100">
+                            <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Lịch đã đến hoặc quá hạn hôm nay ({mergedDue.length})</span>
+                          </div>
+                          {mergedDue.map((card, index) => (
+                            <Card 
+                              key={card.id}
+                              card={card}
+                              customers={customers}
+                              products={products}
+                              brands={brands}
+                              index={index}
+                              onEdit={() => setEditingCardId(card.id)}
+                              onMove={(tid) => moveCard(card.id, tid)}
+                              onMoveBack={() => moveBackFromXong(card.id)}
+                              onTagEdit={() => setTagModalCardId(card.id)}
+                              onHistory={() => setHistoryCardId(card.id)}
+                              onNoteEdit={() => setNoteEditCardId(card.id)}
+                              onDoctorReply={() => setDoctorReplyCardId(card.id)}
+                              onNotify={() => {
+                                confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
+                              }}
+                              onAddDo={() => setAddDoCardId(card.id)}
+                              updateCard={updateCard}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Section 2: Replied not notified */}
+                    {(() => {
+                      const replied = cards.filter(c => c.tabId !== 0 && c.tabId !== 7 && c.doctorText && !c.doctorHidden && !c.notified);
+                      const mergedReplied = [];
+                      const seenReplied = new Set();
+                      for (const c of replied) {
+                        const lowName = c.name.toLowerCase().trim();
+                        if (!seenReplied.has(lowName)) {
+                          seenReplied.add(lowName);
+                          mergedReplied.push(c);
+                        }
+                      }
+                      if (mergedReplied.length === 0) return null;
+                      return (
+                        <div className="space-y-4 pt-4 border-t border-rose-100">
+                          <div className="px-3 py-1.5 bg-violet-50 rounded-xl inline-block border border-violet-100">
+                            <span className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Bác sĩ phản hồi - Chưa báo khách ({mergedReplied.length})</span>
+                          </div>
+                          {mergedReplied.map((card, index) => (
+                            <Card 
+                              key={card.id}
+                              card={card}
+                              customers={customers}
+                              products={products}
+                              brands={brands}
+                              index={index}
+                              onEdit={() => setEditingCardId(card.id)}
+                              onMove={(tid) => moveCard(card.id, tid)}
+                              onMoveBack={() => moveBackFromXong(card.id)}
+                              onTagEdit={() => setTagModalCardId(card.id)}
+                              onHistory={() => setHistoryCardId(card.id)}
+                              onNoteEdit={() => setNoteEditCardId(card.id)}
+                              onDoctorReply={() => setDoctorReplyCardId(card.id)}
+                              onNotify={() => {
+                                confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
+                              }}
+                              onAddDo={() => setAddDoCardId(card.id)}
+                              updateCard={updateCard}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  filteredCards.map((card, index) => (
+                    <Card 
+                      key={card.id}
+                      card={card}
+                      customers={customers}
+                      products={products}
+                      brands={brands}
+                      index={index}
+                      onEdit={() => setEditingCardId(card.id)}
+                      onMove={(tid) => moveCard(card.id, tid)}
+                      onMoveBack={() => moveBackFromXong(card.id)}
+                      onTagEdit={() => setTagModalCardId(card.id)}
+                      onHistory={() => setHistoryCardId(card.id)}
+                      onNoteEdit={() => setNoteEditCardId(card.id)}
+                      onDoctorReply={() => setDoctorReplyCardId(card.id)}
+                      onNotify={() => {
+                        confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
+                      }}
+                      onAddDo={() => setAddDoCardId(card.id)}
+                      updateCard={updateCard}
+                    />
+                  ))
+                )
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-pastel-subtext italic">
                   <span className="text-sm">Không có dữ liệu</span>
@@ -907,7 +1004,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             <div className="p-6 shrink-0 bg-transparent pb-[calc(1.5rem+env(safe-area-inset-bottom))] sticky bottom-0 z-[1200] pointer-events-none">
               <button 
                 onClick={handleCreateCard}
-                className="w-full bg-rose-400 hover:bg-rose-500 py-4.5 rounded-2xl text-white font-black text-lg shadow-2xl shadow-rose-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all min-h-[64px] pointer-events-auto"
+                className="w-full bg-rose-400 hover:bg-rose-500 py-4.5 rounded-2xl text-white font-black text-lg shadow-2xl shadow-rose-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all min-h-[64px] pointer-events-auto border-none outline-none"
               >
                 <Plus className="w-7 h-7 stroke-[3]" /> Tạo thẻ mới
               </button>
@@ -937,6 +1034,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             onUpdatePurposes={setLedgerPurposes}
             onUpdateTransactions={setLedgerTransactions}
             onUpdateLogs={setLedgerLogs}
+            onUpdateCustomers={setCustomers}
             onClose={() => {
               setCurrentView('kanban');
               setDebtHistoryCustomerId(null);
@@ -953,9 +1051,11 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             products={products}
             onUpdateOrders={setOrders}
             onUpdateTransactions={setLedgerTransactions}
+            onUpdateLogs={setLedgerLogs}
             ledgerTransactions={ledgerTransactions}
             ledgerPurposes={ledgerPurposes}
             ledgerAccounts={ledgerAccounts}
+            ledgerLogs={ledgerLogs}
             onUpdateCustomers={setCustomers}
             customerGroups={customerGroups}
             onUpdateGroups={setCustomerGroups}
@@ -965,6 +1065,12 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             }}
             onAddCardLog={addCardLogByCustomer}
             compressionSettings={compressionSettings}
+            skinAudits={skinAudits}
+            skinAuditLogs={skinAuditLogs}
+            skinIssues={skinIssues}
+            onUpdateSkinAudits={setSkinAudits}
+            onUpdateSkinAuditLogs={setSkinAuditLogs}
+            username={username}
             onClose={() => setCurrentView('kanban')}
             deviceView={deviceView}
             isPage={true}
@@ -1034,13 +1140,27 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             products={products}
             onUpdateOrders={setOrders}
             onUpdateTransactions={setLedgerTransactions}
+            onUpdateLogs={setLedgerLogs}
             ledgerTransactions={ledgerTransactions}
             ledgerPurposes={ledgerPurposes}
             ledgerAccounts={ledgerAccounts}
+            ledgerLogs={ledgerLogs}
             onUpdateCustomers={setCustomers}
             customerGroups={customerGroups}
             onUpdateGroups={setCustomerGroups}
+            onViewDebtHistory={(id) => {
+              setDebtHistoryCustomerId(id);
+              setCurrentView('ledger');
+              setShowOrderManagement(false);
+            }}
+            onAddCardLog={addCardLogByCustomer}
             compressionSettings={compressionSettings}
+            skinAudits={skinAudits}
+            skinAuditLogs={skinAuditLogs}
+            skinIssues={skinIssues}
+            onUpdateSkinAudits={setSkinAudits}
+            onUpdateSkinAuditLogs={setSkinAuditLogs}
+            username={username}
             onClose={() => setShowOrderManagement(false)}
             deviceView={deviceView}
           />
@@ -1051,6 +1171,16 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             customers={customers}
             customerGroups={customerGroups}
             transactions={ledgerTransactions}
+            ledgerAccounts={ledgerAccounts}
+            ledgerPurposes={ledgerPurposes}
+            onUpdateTransactions={setLedgerTransactions}
+            onUpdateLogs={setLedgerLogs}
+            skinAudits={skinAudits}
+            skinAuditLogs={skinAuditLogs}
+            skinIssues={skinIssues}
+            username={username}
+            onUpdateSkinAudits={setSkinAudits}
+            onUpdateSkinAuditLogs={setSkinAuditLogs}
             onClose={() => setShowCustomerManagement(false)}
             onUpdateCustomers={(newCustomers) => setCustomers(newCustomers)}
             onUpdateGroups={setCustomerGroups}
@@ -1109,10 +1239,32 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             card={cards.find(c => c.id === doctorReplyCardId)!}
             onClose={() => setDoctorReplyCardId(null)}
             onSave={(reply) => {
+              const cardToEdit = cards.find(c => c.id === doctorReplyCardId)!;
+              const oldReplies = cardToEdit.doctorReplies || (cardToEdit.doctorText ? [{text: cardToEdit.doctorText, date: cardToEdit.doctorDate || getTodayFormatted()}] : []);
+              
+              let newReplies = [...oldReplies];
+              if (cardToEdit.replyAgain) {
+                if (reply.trim()) {
+                  newReplies.push({ text: reply, date: getTodayFormatted() });
+                }
+              } else {
+                if (newReplies.length > 0) {
+                  if (!reply.trim()) {
+                    newReplies.pop();
+                  } else {
+                    newReplies[newReplies.length - 1].text = reply;
+                  }
+                } else if (reply.trim()) {
+                  newReplies.push({ text: reply, date: getTodayFormatted() });
+                }
+              }
+
               const updates: Partial<KanbanCard> = { 
-                doctorText: reply,
-                doctorDate: getTodayFormatted(),
-                doctorHidden: !reply 
+                doctorReplies: newReplies,
+                doctorText: newReplies.length > 0 ? newReplies[newReplies.length - 1].text : undefined,
+                doctorDate: newReplies.length > 0 ? newReplies[newReplies.length - 1].date : undefined,
+                doctorHidden: newReplies.length === 0,
+                replyAgain: false
               };
               updateCard(doctorReplyCardId, updates);
               addLog(doctorReplyCardId, "Bác sĩ phản hồi");
@@ -1134,9 +1286,11 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           <ProductManagementModal 
             brands={brands}
             categories={productCategories}
+            skinIssues={skinIssues}
             products={products}
             onUpdateBrands={setBrands}
             onUpdateCategories={setProductCategories}
+            onUpdateSkinIssues={setSkinIssues}
             onUpdateProducts={setProducts}
             onClose={() => setShowProductManagement(false)}
             compressionSettings={compressionSettings}
@@ -1155,19 +1309,6 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
               setAddDoCardId(null);
             }}
             onClose={() => setAddDoCardId(null)}
-          />
-        )}
- 
-        {showSkinAudit && (
-          <SkinAuditModal 
-            customers={customers}
-            skinAudits={skinAudits}
-            skinAuditLogs={skinAuditLogs}
-            username={username}
-            onUpdateAudits={setSkinAudits}
-            onUpdateLogs={setSkinAuditLogs}
-            onClose={() => setShowSkinAudit(false)}
-            deviceView={deviceView}
           />
         )}
  

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { X, Package, Box, Tags, Plus, Pencil, Trash2, ArrowDownAZ, ArrowUpZA, Save, Image as ImageIcon, CloudUpload } from "lucide-react";
 import { motion } from "motion/react";
-import { Brand, ProductCategory, Product, ImageCompressionSettings } from "../../types";
+import { Brand, ProductCategory, Product, ImageCompressionSettings, SkinIssue } from "../../types";
 import { cn } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { uploadToFirebase } from "../../lib/imageUtils";
@@ -10,9 +10,11 @@ import { Pagination } from "../Pagination";
 interface ProductManagementModalProps {
   brands: Brand[];
   categories: ProductCategory[];
+  skinIssues: SkinIssue[];
   products: Product[];
   onUpdateBrands: (brands: Brand[]) => void;
   onUpdateCategories: (categories: ProductCategory[]) => void;
+  onUpdateSkinIssues: (skinIssues: SkinIssue[]) => void;
   onUpdateProducts: (products: Product[]) => void;
   onClose: () => void;
   compressionSettings: ImageCompressionSettings;
@@ -20,13 +22,13 @@ interface ProductManagementModalProps {
 }
 
 export default function ProductManagementModal({
-  brands, categories, products,
-  onUpdateBrands, onUpdateCategories, onUpdateProducts,
+  brands, categories, skinIssues, products,
+  onUpdateBrands, onUpdateCategories, onUpdateSkinIssues, onUpdateProducts,
   onClose,
   compressionSettings,
   deviceView = 'desktop'
 }: ProductManagementModalProps) {
-  const [activeTab, setActiveTab] = useState<0 | 1 | 2>(0);
+  const [activeTab, setActiveTab] = useState<0 | 1 | 2 | 3>(0);
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
 
   return (
@@ -90,6 +92,15 @@ export default function ProductManagementModal({
           >
             3. Sản phẩm
           </button>
+          <button
+            onClick={() => setActiveTab(3)}
+            className={cn(
+              "text-[10px] font-black px-4 py-2 rounded-xl transition-all whitespace-nowrap uppercase tracking-wider shadow-sm",
+              activeTab === 3 ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 border border-pastel-border'
+            )}
+          >
+            4. Vấn đề da
+          </button>
         </div>
       </div>
 
@@ -109,6 +120,9 @@ export default function ProductManagementModal({
             setConfirmConfig={setConfirmConfig} 
             compressionSettings={compressionSettings}
           />
+        )}
+        {activeTab === 3 && (
+          <SkinIssueTab skinIssues={skinIssues} onUpdateSkinIssues={onUpdateSkinIssues} setConfirmConfig={setConfirmConfig} />
         )}
       </div>
 
@@ -529,7 +543,9 @@ function ProductTab({
     usage: "",
     description: "",
     strength: "",
-    daysToUse: ""
+    daysToUse: "",
+    mfgDate: "",
+    expDate: ""
   });
 
   const [viewDetailsId, setViewDetailsId] = useState<string | null>(null);
@@ -558,7 +574,9 @@ function ProductTab({
         usage: details.usage || undefined,
         description: details.description || undefined,
         strength: details.strength || undefined,
-        daysToUse: details.daysToUse ? Number(details.daysToUse) : undefined
+        daysToUse: details.daysToUse ? Number(details.daysToUse) : undefined,
+        mfgDate: details.mfgDate || undefined,
+        expDate: details.expDate || undefined
       }
     };
     onUpdateProducts([...products, newProduct]);
@@ -572,7 +590,9 @@ function ProductTab({
       usage: "",
       description: "",
       strength: "",
-      daysToUse: ""
+      daysToUse: "",
+      mfgDate: "",
+      expDate: ""
     });
     setError(null);
   };
@@ -780,6 +800,24 @@ function ProductTab({
                   className="w-full bg-white rounded-lg px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-amber-300" 
                 />
               </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Ngày SX (MFG)</label>
+                <input 
+                  type="date" 
+                  value={details.mfgDate}
+                  onChange={e => setDetails(prev => ({ ...prev, mfgDate: e.target.value }))}
+                  className="w-full bg-white rounded-lg px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-amber-300" 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Hạn SD (EXP)</label>
+                <input 
+                  type="date" 
+                  value={details.expDate}
+                  onChange={e => setDetails(prev => ({ ...prev, expDate: e.target.value }))}
+                  className="w-full bg-white rounded-lg px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-amber-300" 
+                />
+              </div>
             </div>
           )}
         </div>
@@ -921,6 +959,8 @@ function ProductTab({
                         <div className="col-span-2"><div className="text-[10px] font-black text-pastel-subtext uppercase">Hướng dẫn</div><div className="font-bold">{product.details?.description || '-'}</div></div>
                         <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Độ mạnh</div><div className="font-bold">{product.details?.strength || '-'}</div></div>
                         <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Số ngày dùng</div><div className="font-bold">{product.details?.daysToUse || '0'} ngày</div></div>
+                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Ngày SX</div><div className="font-bold">{product.details?.mfgDate || '-'}</div></div>
+                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Hạn SD</div><div className="font-bold">{product.details?.expDate || '-'}</div></div>
                       </div>
                     )}
                   </div>
@@ -971,7 +1011,9 @@ function DetailEditor({
     usage: product.details?.usage || "",
     description: product.details?.description || "",
     strength: product.details?.strength || "",
-    daysToUse: product.details?.daysToUse?.toString() || ""
+    daysToUse: product.details?.daysToUse?.toString() || "",
+    mfgDate: product.details?.mfgDate || "",
+    expDate: product.details?.expDate || ""
   });
   const [imageUrl, setImageUrl] = useState(product.imageUrl || "");
   const [isUploading, setIsUploading] = useState(false);
@@ -1018,7 +1060,9 @@ function DetailEditor({
         usage: data.usage || undefined,
         description: data.description || undefined,
         strength: data.strength || undefined,
-        daysToUse: data.daysToUse ? Number(data.daysToUse) : undefined
+        daysToUse: data.daysToUse ? Number(data.daysToUse) : undefined,
+        mfgDate: data.mfgDate || undefined,
+        expDate: data.expDate || undefined
       }
     });
   };
@@ -1137,6 +1181,24 @@ function DetailEditor({
           className="w-full bg-pastel-bg rounded-lg px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-amber-300" 
         />
       </div>
+      <div className="space-y-1">
+        <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Ngày SX (MFG)</label>
+        <input 
+          type="date" 
+          value={data.mfgDate}
+          onChange={e => setData(prev => ({ ...prev, mfgDate: e.target.value }))}
+          className="w-full bg-pastel-bg rounded-lg px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-amber-300" 
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Hạn SD (EXP)</label>
+        <input 
+          type="date" 
+          value={data.expDate}
+          onChange={e => setData(prev => ({ ...prev, expDate: e.target.value }))}
+          className="w-full bg-pastel-bg rounded-lg px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-amber-300" 
+        />
+      </div>
       <div className="col-span-full flex justify-end mt-2">
         <button 
           onClick={handleSave}
@@ -1148,4 +1210,159 @@ function DetailEditor({
     </div>
   </div>
 );
+}
+
+// SkinIssueTab Component
+function SkinIssueTab({ 
+  skinIssues, 
+  onUpdateSkinIssues, 
+  setConfirmConfig 
+}: { 
+  skinIssues: SkinIssue[], 
+  onUpdateSkinIssues: (c: SkinIssue[]) => void, 
+  setConfirmConfig: any 
+}) {
+  const [sortAsc, setSortAsc] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  const sortedIssues = useMemo(() => {
+    return [...skinIssues].sort((a, b) => 
+      sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
+    );
+  }, [skinIssues, sortAsc]);
+
+  const handleAdd = () => {
+    if (!newName.trim()) return;
+    const newIssue: SkinIssue = { id: `skin-${Date.now()}`, name: newName.trim() };
+    onUpdateSkinIssues([...skinIssues, newIssue]);
+    setNewName("");
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (!editName.trim()) return;
+    onUpdateSkinIssues(skinIssues.map(c => c.id === id ? { ...c, name: editName.trim() } : c));
+    setEditingId(null);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    setConfirmConfig({
+      message: `Bạn có chắc chắn muốn xóa vấn đề da "${name}"?`,
+      action: () => {
+        onUpdateSkinIssues(skinIssues.filter(c => c.id !== id));
+        setConfirmConfig(null);
+      }
+    });
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white rounded-[32px] p-6 shadow-sm border border-pastel-border/50">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h3 className="text-xl font-black text-slate-800">Vấn đề da</h3>
+          <p className="text-xs font-bold text-slate-400 mt-1">Quản lý danh sách các vấn đề da</p>
+        </div>
+        <button
+          onClick={() => setSortAsc(!sortAsc)}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl font-bold text-xs transition-colors border border-slate-200"
+        >
+          {sortAsc ? <ArrowDownAZ className="w-4 h-4" /> : <ArrowUpZA className="w-4 h-4" />}
+          Sắp xếp
+        </button>
+      </div>
+
+      <div className="flex gap-3 mb-8">
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+          placeholder="Nhập tên vấn đề mới..."
+          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-amber-300 focus:bg-white transition-all shadow-sm"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!newName.trim()}
+          className="px-6 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:hover:bg-amber-500 text-white rounded-xl font-black text-sm transition-colors shadow-lg shadow-amber-200 flex items-center gap-2 shrink-0"
+        >
+          <Plus className="w-5 h-5" /> Thêm
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-2 overflow-y-auto no-scrollbar pb-20">
+        {/* Header Row */}
+        <div className="flex items-center px-6 pt-2 pb-4 border-b-2 border-slate-100 sticky top-0 bg-white z-10 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+          <div className="w-16">STT</div>
+          <div className="flex-1">Tên vấn đề da</div>
+          <div className="w-24 text-right pr-2">Thao tác</div>
+        </div>
+
+        {/* Rows */}
+        {sortedIssues.map((issue, idx) => (
+          <div key={issue.id} className="flex items-center px-6 py-4 bg-slate-50/50 hover:bg-amber-50/30 border border-slate-100 hover:border-amber-200 rounded-2xl transition-all group">
+            <div className="w-16 font-black text-slate-300 text-lg">
+              {(idx + 1).toString().padStart(2, '0')}
+            </div>
+            <div className="flex-1">
+              {editingId === issue.id ? (
+                <input 
+                  type="text"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveEdit(issue.id);
+                    if (e.key === 'Escape') setEditingId(null);
+                  }}
+                  autoFocus
+                  className="w-full max-w-[300px] bg-white border-2 border-amber-300 rounded-lg px-3 py-1.5 text-sm font-bold outline-none"
+                />
+              ) : (
+                <span className="font-bold text-slate-700 text-sm">{issue.name}</span>
+              )}
+            </div>
+            <div className="w-24 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {editingId === issue.id ? (
+                <>
+                  <button onClick={() => handleSaveEdit(issue.id)} className="w-8 h-8 flex items-center justify-center rounded-lg text-emerald-500 hover:bg-emerald-50 transition-colors">
+                    <Save className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setEditingId(null)} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => {
+                      setEditingId(issue.id);
+                      setEditName(issue.name);
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-amber-500 hover:bg-amber-50 transition-colors"
+                    title="Sửa"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(issue.id, issue.name)}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
+                    title="Xóa"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {sortedIssues.length === 0 && (
+          <div className="py-20 text-center">
+            <Tags className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+            <p className="text-slate-400 font-medium text-sm">Chưa có vấn đề da nào</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

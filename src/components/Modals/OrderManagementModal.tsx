@@ -28,8 +28,12 @@ import {
   LedgerTransaction, 
   LedgerPurpose,
   LedgerAccount,
+  LedgerLog,
   CustomerGroup,
-  ImageCompressionSettings
+  ImageCompressionSettings,
+  SkinAuditEntry,
+  SkinAuditLog,
+  SkinIssue
 } from "../../types";
 import { cn, getTodayIso, formatIsoToPretty } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -44,14 +48,22 @@ interface OrderManagementModalProps {
   ledgerTransactions: LedgerTransaction[];
   ledgerPurposes: LedgerPurpose[];
   ledgerAccounts: LedgerAccount[];
+  ledgerLogs: LedgerLog[];
   onUpdateOrders: (orders: Order[]) => void;
   onUpdateTransactions: (transactions: LedgerTransaction[]) => void;
+  onUpdateLogs: (logs: LedgerLog[]) => void;
   onUpdateCustomers: (customers: Customer[]) => void;
   customerGroups: CustomerGroup[];
   onUpdateGroups: (groups: CustomerGroup[]) => void;
   onViewDebtHistory?: (id: string) => void;
   onAddCardLog?: (customerName: string, action: string) => void;
   compressionSettings: ImageCompressionSettings;
+  skinAudits: SkinAuditEntry[];
+  skinAuditLogs: SkinAuditLog[];
+  skinIssues: SkinIssue[];
+  onUpdateSkinAudits: (audits: SkinAuditEntry[]) => void;
+  onUpdateSkinAuditLogs: (logs: SkinAuditLog[]) => void;
+  username: string;
   onClose: () => void;
   deviceView?: 'desktop' | 'mobile';
   isPage?: boolean;
@@ -64,14 +76,22 @@ export default function OrderManagementModal({
   ledgerTransactions,
   ledgerPurposes,
   ledgerAccounts,
+  ledgerLogs,
   onUpdateOrders,
   onUpdateTransactions,
+  onUpdateLogs,
   onUpdateCustomers,
   customerGroups,
   onUpdateGroups,
   onViewDebtHistory,
   onAddCardLog,
   compressionSettings,
+  skinAudits,
+  skinAuditLogs,
+  skinIssues,
+  onUpdateSkinAudits,
+  onUpdateSkinAuditLogs,
+  username,
   onClose,
   deviceView = 'desktop',
   isPage = false
@@ -80,6 +100,15 @@ export default function OrderManagementModal({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
+
+  const getCustomerBalance = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    const initial = customer?.initialDebt || 0;
+    const customerTx = ledgerTransactions.filter(t => t.customerId === customerId);
+    const thu = customerTx.filter(t => t.type === 'Thu').reduce((sum, t) => sum + t.amount, 0);
+    const chi = customerTx.filter(t => t.type === 'Chi').reduce((sum, t) => sum + t.amount, 0);
+    return initial + (chi - thu);
+  };
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -112,7 +141,7 @@ export default function OrderManagementModal({
   });
 
   const customerSuggestions = useMemo(() => {
-    if (customerSearch.length < 3) return [];
+    if (!customerSearch.trim()) return customers.slice(0, 50);
     return customers.filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()));
   }, [customers, customerSearch]);
 
@@ -154,9 +183,11 @@ export default function OrderManagementModal({
       
       const item = { ...newItems[index], ...updates };
       
-      // If product changed, auto-fill price
+      // If product changed, auto-fill price and dates
       if (updates.productId !== undefined && product) {
         item.unitPrice = product.price || product.details?.sellingPrice || 0;
+        item.mfgDate = product.details?.mfgDate || undefined;
+        item.expDate = product.details?.expDate || undefined;
       }
 
       // Calculate discount amount
@@ -207,8 +238,9 @@ export default function OrderManagementModal({
         }
 
         const date = getTodayIso();
+        const shouldCreateTransaction = totalAmountAfterDiscount > 0;
 
-        const transaction: LedgerTransaction = {
+        const transaction: LedgerTransaction | null = shouldCreateTransaction ? {
           id: `tx-ord-${orderId}`,
           accountId: defaultAccount.id,
           purposeId: chiPurpose.id,
@@ -218,7 +250,7 @@ export default function OrderManagementModal({
           type: 'Chi',
           createdAt: Date.now(),
           customerId: formState.customerId
-        };
+        } : null;
 
         const newOrder: Order = {
           id: orderId,
@@ -230,19 +262,31 @@ export default function OrderManagementModal({
           city: formState.city,
           district: formState.district,
           address: formState.address,
-          transactionId: transaction.id
+          transactionId: transaction?.id
         };
 
         if (editingId) {
           onUpdateOrders(orders.map(o => o.id === editingId ? newOrder : o));
-          onUpdateTransactions(ledgerTransactions.map(t => t.id === `tx-ord-${editingId}` ? transaction : t));
+          
+          if (shouldCreateTransaction) {
+            const txExists = ledgerTransactions.some(t => t.id === `tx-ord-${editingId}`);
+            if (txExists) {
+              onUpdateTransactions(ledgerTransactions.map(t => t.id === `tx-ord-${editingId}` ? transaction : t));
+            } else {
+              onUpdateTransactions([transaction, ...ledgerTransactions]);
+            }
+          } else {
+            onUpdateTransactions(ledgerTransactions.filter(t => t.id !== `tx-ord-${editingId}`));
+          }
           
           if (selectedCustomer) {
             onAddCardLog?.(selectedCustomer.name, `Cập nhật đơn hàng #${orderId.slice(-6).toUpperCase()}: ${totalAmountAfterDiscount.toLocaleString('vi-VN')}đ`);
           }
         } else {
           onUpdateOrders([newOrder, ...orders]);
-          onUpdateTransactions([transaction, ...ledgerTransactions]);
+          if (transaction) {
+            onUpdateTransactions([transaction, ...ledgerTransactions]);
+          }
           
           if (selectedCustomer) {
             onAddCardLog?.(selectedCustomer.name, `Tạo đơn hàng mới #${orderId.slice(-6).toUpperCase()}: ${totalAmountAfterDiscount.toLocaleString('vi-VN')}đ`);
@@ -318,14 +362,6 @@ export default function OrderManagementModal({
           </div>
         </div>
         <div className="flex items-center gap-2">
-            {!showForm && (
-              <button 
-                onClick={() => setShowForm(true)}
-                className="px-6 py-3 bg-sky-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-sky-100 flex items-center gap-2 active:scale-95 transition-all border-b-4 border-sky-800"
-              >
-                <Plus className="w-4 h-4" /> THÊM ĐƠN
-              </button>
-            )}
           </div>
       </div>
 
@@ -345,53 +381,72 @@ export default function OrderManagementModal({
 
           {/* List Area */}
           <div className="flex-1 bg-white border border-pastel-border rounded-[40px] overflow-hidden flex flex-col shadow-sm">
-            <div className="flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0">
+            <div className="hidden lg:flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0 items-center">
               <div className="w-10 text-center">STT</div>
-              <div className="flex-1 px-4">Khách hàng / Liên hệ</div>
-              <div className="flex-1">Sản phẩm tiêu biểu</div>
-              <div className="w-32 text-center text-rose-500">Thành tiền</div>
-              <div className="w-24 text-right">Thao tác</div>
+              <div className="w-56 px-4">Khách hàng</div>
+              <div className="flex-1">Sản phẩm</div>
+              <div className="w-28 text-right text-rose-500">Công nợ KH</div>
+              <div className="w-28 text-right text-sky-600">Tổng tiền</div>
+              <div className="w-24 text-right pr-4">Thao tác</div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
               {paginatedOrders.map((order, idx) => {
                 const customer = customers.find(c => c.id === order.customerId);
+                const debt = getCustomerBalance(order.customerId);
+                
                 return (
-                  <div key={idx} className="flex items-center gap-4 p-4 hover:bg-sky-50/20 border-b border-pastel-border/30 last:border-0 transition-colors">
-                    <span className="text-xs font-black text-pastel-subtext w-10 text-center">
-                      {(currentPage - 1) * pageSize + idx + 1}
-                    </span>
-                    
-                    <div className="flex-1 flex items-center gap-4 px-4 overflow-hidden">
-                      <div className="w-10 h-10 rounded-xl bg-pastel-bg flex items-center justify-center overflow-hidden border border-pastel-border shrink-0">
-                        {customer?.imageUrl ? <img src={customer.imageUrl} className="w-full h-full object-cover" /> : <UserPlus className="w-5 h-5 text-pastel-subtext/20" />}
+                  <div key={idx} className="flex flex-col lg:flex-row lg:items-start gap-4 p-4 hover:bg-sky-50/20 border-b border-pastel-border/30 last:border-0 transition-colors">
+                    <div className="flex items-start lg:items-center justify-between lg:w-auto">
+                      <span className="text-xs font-black text-pastel-subtext w-10 text-center lg:block hidden mt-2">
+                        {(currentPage - 1) * pageSize + idx + 1}
+                      </span>
+                      <div className="flex items-center gap-3 px-0 lg:px-2 w-56">
+                        <div className="w-10 h-10 rounded-xl bg-pastel-bg flex items-center justify-center overflow-hidden border border-pastel-border shrink-0">
+                          {customer?.imageUrl ? <img src={customer.imageUrl} className="w-full h-full object-cover" /> : <UserPlus className="w-5 h-5 text-pastel-subtext/20" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="block font-black text-[13px] text-slate-700 truncate">{customer?.name || "N/A"}</span>
+                          <span className="block text-[9px] text-pastel-subtext font-bold uppercase truncate">
+                            {order.address ? `${order.address}, ${order.district}` : "Chưa có địa chỉ"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <span className="block font-black text-sm text-slate-700 truncate">{customer?.name || "N/A"}</span>
-                        <span className="block text-[10px] text-pastel-subtext font-bold uppercase truncate">
-                          {order.address ? `${order.address}, ${order.district}` : "Chưa có địa chỉ"}
-                        </span>
+                      <div className="lg:hidden font-black text-sm text-slate-800">
+                        {order.totalAmount.toLocaleString()}đ
                       </div>
                     </div>
 
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      {order.items.slice(0, 1).map((item, i) => {
+                    <div className="flex-1 min-w-0 flex flex-col space-y-1 lg:ml-0 ml-14">
+                      {order.items.map((item, i) => {
                         const p = products.find(prod => prod.id === item.productId);
+                        const mfg = item.mfgDate ? `NSX: ${item.mfgDate.split('-').reverse().join('/')}` : '';
+                        const exp = item.expDate ? `HSD: ${item.expDate.split('-').reverse().join('/')}` : '';
+                        const dates = [mfg, exp].filter(Boolean).join(' - ');
                         return (
-                          <span key={i} className="block text-xs font-bold text-slate-600 truncate">• {p?.name} x{item.quantity}</span>
+                          <div key={i} className="text-[11px] font-bold text-slate-700 whitespace-nowrap overflow-hidden text-ellipsis flex flex-wrap gap-1 items-center">
+                            <span className="text-sky-500 font-black">{item.quantity} x {item.unitPrice.toLocaleString('vi-VN')}</span>
+                            <span className="text-slate-600">{p?.name || 'Sản phẩm ' + item.productId}</span>
+                            {dates && <span className="text-pastel-subtext text-[9px]">({dates})</span>}
+                          </div>
                         );
                       })}
-                      {order.items.length > 1 && (
-                        <span className="block text-[9px] font-black text-sky-500 uppercase tracking-tighter">+{order.items.length - 1} sp khác</span>
-                      )}
                     </div>
 
-                    <div className="w-32 text-center shrink-0">
-                      <span className="block font-black text-sm text-slate-800">{order.totalAmount.toLocaleString()}đ</span>
+                    <div className="w-28 text-right shrink-0 hidden lg:block mt-1">
+                      <span className={cn(
+                        "block font-black text-xs",
+                        debt > 0 ? "text-rose-500" : "text-emerald-500"
+                      )}>{debt.toLocaleString('vi-VN')}đ</span>
+                    </div>
+
+                    <div className="w-28 text-right shrink-0 hidden lg:block mt-1">
+                      <span className="block font-black text-sm text-sky-600">{order.totalAmount.toLocaleString()}đ</span>
                       <span className="block text-[9px] font-bold text-pastel-subtext">{formatIsoToPretty(order.date)}</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 justify-end w-24">
+                    <div className="flex items-center gap-1.5 shrink-0 justify-end w-full lg:w-24 mt-2 lg:mt-0">
+                      <span className="lg:hidden text-[9px] font-bold text-pastel-subtext mr-auto">{formatIsoToPretty(order.date)}</span>
                       <button 
                         onClick={() => handleEdit(order)}
                         className="p-2.5 text-sky-500 bg-white border border-sky-100 rounded-xl shadow-sm hover:bg-sky-50 active:scale-90 transition-all"
@@ -468,7 +523,7 @@ export default function OrderManagementModal({
                               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-subtext" />
                               <input 
                                 type="text"
-                                placeholder="Nhập tên khách hàng (Gõ tối thiểu 3 chữ)..."
+                                placeholder="Nhập tên khách hàng..."
                                 value={customerSearch}
                                 onChange={(e) => {
                                   setCustomerSearch(e.target.value);
@@ -556,6 +611,17 @@ export default function OrderManagementModal({
                           placeholder="Số nhà, tên đường, phường/xã..."
                           className="w-full bg-white border border-amber-100 rounded-xl p-3.5 text-xs font-bold outline-none focus:border-amber-300 shadow-sm"
                         />
+                        <div className="flex justify-end mt-2">
+                          <button 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setFormState(prev => ({ ...prev, city: "", district: "", address: "" }));
+                            }}
+                            className="text-[10px] font-black text-rose-500 hover:text-rose-600 border border-rose-100 bg-rose-50 px-3 py-1.5 rounded-lg active:scale-95 transition-all w-max"
+                          >
+                            Địa chỉ khác
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -575,8 +641,8 @@ export default function OrderManagementModal({
                             
                             <div className="space-y-3">
                               <div className="flex justify-between items-center text-sm font-bold border-b border-sky-400 pb-2">
-                                <span className="text-sky-100">Số lượng SP:</span>
-                                <span>{formState.items.filter(i => i.productId).length} loại</span>
+                                <span className="text-sky-100">Tổng SL sản phẩm:</span>
+                                <span>{formState.items.filter(i => i.productId).reduce((sum, i) => sum + i.quantity, 0)}</span>
                               </div>
                               <div className="flex justify-between items-center text-sm font-bold border-b border-sky-400 pb-2">
                                 <span className="text-sky-100">Khách:</span>
@@ -608,111 +674,129 @@ export default function OrderManagementModal({
                       <h4 className="text-[11px] font-black text-pastel-subtext uppercase tracking-[0.2em] flex items-center gap-2 px-1">
                         <Package className="w-4 h-4" /> Danh sách sản phẩm
                       </h4>
+                      <button 
+                        onClick={handleAddItem}
+                        className="lg:hidden p-2 bg-sky-50 text-sky-600 rounded-lg"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                     </div>
 
                     <div className="space-y-4">
                       {formState.items.map((item, index) => (
-                        <div key={index} className="grid grid-cols-12 gap-3 items-end bg-white p-2 rounded-2xl relative group">
-                          <div className="col-span-12 md:col-span-4">
-                            <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Sản phẩm</label>
-                            <div className="relative">
-                              <select 
-                                value={item.productId}
-                                onChange={(e) => handleItemChange(index, { productId: e.target.value })}
-                                className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-xs font-bold outline-none focus:border-sky-300 appearance-none"
-                              >
-                                <option value="">-- Chọn sản phẩm --</option>
-                                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                              </select>
-                              <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-subtext pointer-events-none rotate-90" />
+                        <div key={index} className="flex flex-col gap-3 bg-white p-3 md:p-4 rounded-2xl border border-pastel-border/50 relative group">
+                          <div className="flex gap-3">
+                            <div className="flex-1 min-w-0">
+                              <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Sản phẩm</label>
+                              <div className="relative">
+                                <select 
+                                  value={item.productId}
+                                  onChange={(e) => handleItemChange(index, { productId: e.target.value })}
+                                  className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-2.5 md:p-3 text-xs font-bold outline-none focus:border-sky-300 appearance-none truncate pr-8"
+                                >
+                                  <option value="">-- Chọn sản phẩm --</option>
+                                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-subtext pointer-events-none rotate-90" />
+                              </div>
+                              
+                              {/* MFG / EXP Dates */}
+                              {(item.mfgDate || item.expDate) && (
+                                <div className="flex gap-4 mt-2 px-1">
+                                  {item.mfgDate && (
+                                    <div className="flex items-center gap-1.5 text-[10px]">
+                                      <span className="font-black text-slate-400 uppercase">MFG:</span>
+                                      <span className="font-bold text-slate-700">{item.mfgDate.split('-').reverse().join('/')}</span>
+                                    </div>
+                                  )}
+                                  {item.expDate && (
+                                    <div className="flex items-center gap-1.5 text-[10px]">
+                                      <span className="font-black text-rose-400 uppercase">EXP:</span>
+                                      <span className="font-bold text-rose-600">{item.expDate.split('-').reverse().join('/')}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          </div>
-
-                          <div className="col-span-4 md:col-span-1">
-                            <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">SL</label>
-                            <input 
-                              type="number"
-                              min="1"
-                              value={item.quantity}
-                              onChange={(e) => handleItemChange(index, { quantity: parseInt(e.target.value) || 1 })}
-                              className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-xs font-bold text-center outline-none focus:border-sky-300"
-                            />
-                          </div>
-
-                          <div className="col-span-8 md:col-span-2">
-                            <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Đơn giá</label>
-                            <div className="relative">
-                              <input 
-                                type="text"
-                                value={item.unitPrice.toLocaleString('vi-VN')}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
-                                  handleItemChange(index, { unitPrice: val });
-                                }}
-                                className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-xs font-black outline-none focus:border-sky-300"
-                              />
-                              <Pencil className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-pastel-subtext pointer-events-none" />
-                            </div>
-                          </div>
-
-                          <div className="col-span-6 md:col-span-2">
-                            <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Ưu đãi</label>
-                            <div className="flex bg-pastel-bg border border-pastel-border rounded-xl p-1">
+                            <div className="w-16 md:w-20 shrink-0">
+                              <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block text-center">SL</label>
                               <input 
                                 type="number"
-                                value={item.discountValue}
-                                onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0;
-                                  handleItemChange(index, { discountValue: val });
-                                }}
-                                className="w-full bg-transparent p-2 text-xs font-bold text-rose-500 outline-none"
-                                placeholder="0"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => handleItemChange(index, { quantity: parseInt(e.target.value) || 1 })}
+                                className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-2.5 md:p-3 text-xs font-bold text-center outline-none focus:border-sky-300"
                               />
-                              <div className="flex gap-1 shrink-0">
-                                <button 
-                                  onClick={() => handleItemChange(index, { discountType: 'amount' })}
-                                  className={cn(
-                                    "p-1.5 rounded-lg transition-all",
-                                    item.discountType === 'amount' ? "bg-rose-500 text-white shadow-sm" : "text-pastel-subtext hover:bg-white"
-                                  )}
-                                  title="Giảm theo tiền"
-                                >
-                                  <Banknote className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  onClick={() => handleItemChange(index, { discountType: 'percent' })}
-                                  className={cn(
-                                    "p-1.5 rounded-lg transition-all",
-                                    item.discountType === 'percent' ? "bg-rose-500 text-white shadow-sm" : "text-pastel-subtext hover:bg-white"
-                                  )}
-                                  title="Giảm theo %"
-                                >
-                                  <Percent className="w-3.5 h-3.5" />
-                                </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 items-end">
+                            <div>
+                              <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Đơn giá</label>
+                              <div className="relative">
+                                <input 
+                                  type="text"
+                                  value={item.unitPrice.toLocaleString('vi-VN')}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                                    handleItemChange(index, { unitPrice: val });
+                                  }}
+                                  className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-2.5 md:p-3 text-[11px] md:text-xs font-black outline-none focus:border-sky-300"
+                                />
+                                <Pencil className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-pastel-subtext pointer-events-none" />
                               </div>
                             </div>
-                            {item.discountType === 'percent' && (
-                              <span className="text-[9px] font-bold text-rose-400 mt-1 ml-1 block">
-                                Giảm {item.discountValue}% ({(item.discount).toLocaleString()}đ)
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="col-span-6 md:col-span-2">
-                            <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Thành tiền</label>
-                            <div className="w-full bg-sky-50 border border-sky-100 rounded-xl p-3 text-xs font-black text-sky-600">
-                              {item.subtotal.toLocaleString('vi-VN')}
+                            <div>
+                              <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Ưu đãi</label>
+                              <div className="flex bg-pastel-bg border border-pastel-border rounded-xl p-1 h-[41px] md:h-[46px]">
+                                <input 
+                                  type="number"
+                                  value={item.discountValue}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    handleItemChange(index, { discountValue: val });
+                                  }}
+                                  className="w-full bg-transparent px-2 text-[11px] md:text-xs font-bold text-rose-500 outline-none min-w-0"
+                                  placeholder="0"
+                                />
+                                <div className="flex gap-0.5 md:gap-1 shrink-0">
+                                  <button 
+                                    onClick={() => handleItemChange(index, { discountType: 'amount' })}
+                                    className={cn(
+                                      "p-1 rounded-lg transition-all",
+                                      item.discountType === 'amount' ? "bg-rose-500 text-white shadow-sm" : "text-pastel-subtext hover:bg-white"
+                                    )}
+                                  >
+                                    <Banknote className="w-3 md:w-3.5 h-3 md:h-3.5" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleItemChange(index, { discountType: 'percent' })}
+                                    className={cn(
+                                      "p-1 rounded-lg transition-all",
+                                      item.discountType === 'percent' ? "bg-rose-500 text-white shadow-sm" : "text-pastel-subtext hover:bg-white"
+                                    )}
+                                  >
+                                    <Percent className="w-3 md:w-3.5 h-3 md:h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-
-                          <div className="col-span-12 md:col-span-1 flex justify-end">
-                            <button 
-                              onClick={() => handleRemoveItem(index)}
-                              className="p-3 text-rose-400 hover:text-rose-600 transition-all opacity-0 group-hover:opacity-100"
-                              title="Xóa dòng"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
+                            <div className="col-span-2 lg:col-span-1">
+                              <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Thành tiền</label>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-sky-50 border border-sky-100 rounded-xl p-2.5 md:p-3 text-xs font-black text-sky-600">
+                                  {item.subtotal.toLocaleString('vi-VN')} đ
+                                </div>
+                                {formState.items.length > 1 && (
+                                  <button 
+                                    onClick={() => handleRemoveItem(index)}
+                                    className="p-2.5 text-rose-400 hover:text-rose-600 transition-all bg-rose-50 rounded-xl"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -729,6 +813,16 @@ export default function OrderManagementModal({
             customers={customers}
             customerGroups={customerGroups}
             transactions={ledgerTransactions}
+            ledgerAccounts={ledgerAccounts}
+            ledgerPurposes={ledgerPurposes}
+            onUpdateTransactions={onUpdateTransactions}
+            onUpdateLogs={onUpdateLogs}
+            skinAudits={skinAudits}
+            skinAuditLogs={skinAuditLogs}
+            skinIssues={skinIssues}
+            username={username}
+            onUpdateSkinAudits={onUpdateSkinAudits}
+            onUpdateSkinAuditLogs={onUpdateSkinAuditLogs}
             onClose={() => setShowCustomerModal(false)}
             onUpdateCustomers={onUpdateCustomers}
             onUpdateGroups={onUpdateGroups}

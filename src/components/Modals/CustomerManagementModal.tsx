@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { X, Plus, Image as ImageIcon, Trash2, Pencil, ChevronLeft, ChevronRight, User, Save, Users, History } from "lucide-react";
+import { X, Plus, Image as ImageIcon, Trash2, Pencil, ChevronLeft, ChevronRight, User, Save, Users, History, Stethoscope, Search, CheckCircle2, Wallet, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Customer, ImageCompressionSettings, CustomerGroup, LedgerTransaction } from "../../types";
-import { cn } from "../../lib/utils";
+import { Customer, ImageCompressionSettings, CustomerGroup, LedgerTransaction, SkinAuditEntry, SkinAuditLog, LedgerAccount, LedgerPurpose, LedgerLog, SkinIssue } from "../../types";
+import { cn, getTodayIso } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Pagination } from "../Pagination";
 import { uploadToFirebase } from "../../lib/imageUtils";
@@ -14,9 +14,19 @@ interface CustomerManagementModalProps {
   customers: Customer[];
   customerGroups: CustomerGroup[];
   transactions: LedgerTransaction[];
+  ledgerAccounts: LedgerAccount[];
+  ledgerPurposes: LedgerPurpose[];
+  onUpdateTransactions: (transactions: LedgerTransaction[]) => void;
+  onUpdateLogs: (logs: LedgerLog[]) => void;
+  skinAudits: SkinAuditEntry[];
+  skinAuditLogs: SkinAuditLog[];
+  skinIssues: SkinIssue[];
+  username: string;
   onClose: () => void;
   onUpdateCustomers: (customers: Customer[]) => void;
   onUpdateGroups: (groups: CustomerGroup[]) => void;
+  onUpdateSkinAudits: (audits: SkinAuditEntry[]) => void;
+  onUpdateSkinAuditLogs: (logs: SkinAuditLog[]) => void;
   onViewDebtHistory: (customerId: string) => void;
   compressionSettings: ImageCompressionSettings;
   deviceView?: 'desktop' | 'mobile';
@@ -28,9 +38,19 @@ export default function CustomerManagementModal({
   customers, 
   customerGroups,
   transactions,
+  ledgerAccounts,
+  ledgerPurposes,
+  onUpdateTransactions,
+  onUpdateLogs,
+  skinAudits,
+  skinAuditLogs,
+  skinIssues,
+  username,
   onClose, 
   onUpdateCustomers,
   onUpdateGroups,
+  onUpdateSkinAudits,
+  onUpdateSkinAuditLogs,
   onViewDebtHistory,
   compressionSettings,
   deviceView = 'desktop'
@@ -41,6 +61,7 @@ export default function CustomerManagementModal({
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [address, setAddress] = useState("");
+  const [initialDebtStr, setInitialDebtStr] = useState("0");
   const [isUploading, setIsUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showGroupManagement, setShowGroupManagement] = useState(false);
@@ -52,13 +73,93 @@ export default function CustomerManagementModal({
   const [newGroupName, setNewGroupName] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [skinIssueDropdownFor, setSkinIssueDropdownFor] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const totalPages = Math.ceil(customers.length / pageSize) || 1;
+  const getCustomerBalance = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    const initial = customer?.initialDebt || 0;
+    const customerTx = transactions.filter(t => t.customerId === customerId);
+    const thu = customerTx.filter(t => t.type === 'Thu').reduce((sum, t) => sum + t.amount, 0);
+    const chi = customerTx.filter(t => t.type === 'Chi').reduce((sum, t) => sum + t.amount, 0);
+    return initial + (chi - thu);
+  };
+
+  const filteredCustomers = useMemo(() => {
+    if (!searchQuery.trim()) return customers;
+    const q = searchQuery.toLowerCase();
+    return customers.filter(c => 
+      c.name.toLowerCase().includes(q) || 
+      c.address?.toLowerCase().includes(q) || 
+      c.city?.toLowerCase().includes(q) || 
+      c.district?.toLowerCase().includes(q)
+    );
+  }, [customers, searchQuery]);
+
+  const totalPages = Math.ceil(filteredCustomers.length / pageSize) || 1;
   const paginatedCustomers = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return customers.slice(start, start + pageSize);
-  }, [customers, currentPage, pageSize]);
+    return filteredCustomers.slice(start, start + pageSize);
+  }, [filteredCustomers, currentPage, pageSize]);
+
+  const last3Months = useMemo(() => {
+    const now = new Date();
+    const months = [];
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const m = d.getMonth() + 1;
+      const y = d.getFullYear();
+      months.push({
+        label: `T${m}/${y}`,
+        value: `${y}-${m.toString().padStart(2, '0')}`
+      });
+    }
+    return months.reverse(); // Current month is last
+  }, []);
+
+  const handleToggleSkinAudit = (customerId: string, month: string, type: 'Khám' | 'Kiểm tra') => {
+    const existing = skinAudits.find(e => e.customerId === customerId && e.month === month && e.type === type);
+    
+    if (existing) {
+      // Delete
+      onUpdateSkinAudits(skinAudits.filter(e => e.id !== existing.id));
+      const newLog: SkinAuditLog = {
+        id: `log-${Date.now()}`,
+        customerId,
+        action: 'delete',
+        type,
+        month,
+        date: existing.date,
+        user: username,
+        timestamp: new Date().toLocaleString('vi-VN')
+      };
+      onUpdateSkinAuditLogs([newLog, ...skinAuditLogs]);
+    } else {
+      // Create
+      const newEntry: SkinAuditEntry = {
+        id: `audit-${Date.now()}`,
+        customerId,
+        month,
+        type,
+        date: new Date().toLocaleDateString('vi-VN'),
+        createdBy: username,
+        createdAt: new Date().toLocaleString('vi-VN')
+      };
+      onUpdateSkinAudits([...skinAudits, newEntry]);
+      const newLog: SkinAuditLog = {
+        id: `log-${Date.now()}`,
+        customerId,
+        action: 'create',
+        type,
+        month,
+        date: newEntry.date,
+        user: username,
+        timestamp: new Date().toLocaleString('vi-VN')
+      };
+      onUpdateSkinAuditLogs([newLog, ...skinAuditLogs]);
+    }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,12 +192,60 @@ export default function CustomerManagementModal({
 
   const handleCreateOrUpdate = () => {
     if (!name.trim()) return;
+    const targetBalance = parseFloat(initialDebtStr.replace(/\./g, "").replace(/,/g, "")) || 0;
 
     if (editingId) {
+      const existingCustomer = customers.find(c => c.id === editingId);
+      const currentBalance = getCustomerBalance(editingId);
+      
+      const diff = targetBalance - currentBalance;
+      const newInitialDebt = (existingCustomer?.initialDebt || 0) + diff;
+      
       const updated = customers.map(c => 
-        c.id === editingId ? { ...c, name: name.trim(), imageUrl, groupId: selectedGroupId || undefined, city: city.trim() || undefined, district: district.trim() || undefined, address: address.trim() || undefined } : c
+        c.id === editingId ? { 
+          ...c, 
+          name: name.trim(), 
+          imageUrl, 
+          groupId: selectedGroupId || undefined, 
+          city: city.trim() || undefined, 
+          district: district.trim() || undefined, 
+          address: address.trim() || undefined,
+          initialDebt: newInitialDebt
+        } : c
       );
       onUpdateCustomers(updated);
+
+      // If balance changed, log transaction
+      if (diff !== 0) {
+        const purpose = ledgerPurposes.find(p => p.name === 'Điều chỉnh' || p.name === 'Khách');
+        const account = ledgerAccounts[0];
+        
+        if (purpose && account) {
+          const newTx: LedgerTransaction = {
+            id: `tx-adj-${Date.now()}`,
+            accountId: account.id,
+            purposeId: purpose.id,
+            amount: Math.abs(diff),
+            date: getTodayIso(),
+            reason: `Điều chỉnh số dư KH ${name.trim()}`,
+            type: diff > 0 ? 'Chi' : 'Thu', // If balance increased, record as 'Chi' or negative payment
+            createdAt: Date.now(),
+            customerId: editingId
+          };
+          onUpdateTransactions([newTx, ...transactions]);
+
+          const newLog: LedgerLog = {
+            id: `log-adj-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            user: username,
+            action: "Sửa",
+            targetType: "Giao dịch",
+            message: `Sửa số dư: ${currentBalance.toLocaleString('vi-VN')} -> ${targetBalance.toLocaleString('vi-VN')}`
+          };
+          onUpdateLogs([newLog]);
+        }
+      }
+
       setEditingId(null);
     } else {
       const newCustomer: Customer = {
@@ -106,7 +255,8 @@ export default function CustomerManagementModal({
         groupId: selectedGroupId || undefined,
         city: city.trim() || undefined,
         district: district.trim() || undefined,
-        address: address.trim() || undefined
+        address: address.trim() || undefined,
+        initialDebt: targetBalance
       };
       onUpdateCustomers([newCustomer, ...customers]);
       setShowCustomerForm(false);
@@ -117,6 +267,7 @@ export default function CustomerManagementModal({
     setCity("");
     setDistrict("");
     setAddress("");
+    setInitialDebtStr("0");
   };
 
   const handleEdit = (customer: Customer) => {
@@ -126,6 +277,8 @@ export default function CustomerManagementModal({
     setCity(customer.city || "");
     setDistrict(customer.district || "");
     setAddress(customer.address || "");
+    // Initialize with current balance instead of initial debt
+    setInitialDebtStr(getCustomerBalance(customer.id).toString());
     setEditingId(customer.id);
     setShowCustomerForm(true);
   };
@@ -204,12 +357,6 @@ export default function CustomerManagementModal({
     });
   };
 
-  const getCustomerBalance = (customerId: string) => {
-    const customerTx = transactions.filter(t => t.customerId === customerId);
-    const thu = customerTx.filter(t => t.type === 'Thu').reduce((sum, t) => sum + t.amount, 0);
-    const chi = customerTx.filter(t => t.type === 'Chi').reduce((sum, t) => sum + t.amount, 0);
-    return thu - chi;
-  };
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
 
@@ -254,13 +401,17 @@ export default function CustomerManagementModal({
   };
 
   const handleCancelCustomerForm = () => {
-    if (name.trim() || imageUrl) {
+    if (name.trim() || imageUrl || initialDebtStr !== "0") {
       setConfirmConfig({
         message: "Bạn có chắc chắn muốn hủy? Dữ liệu đang nhập sẽ bị mất.",
         action: () => {
           setName("");
           setImageUrl("");
           setSelectedGroupId("");
+          setCity("");
+          setDistrict("");
+          setAddress("");
+          setInitialDebtStr("0");
           setEditingId(null);
           setShowCustomerForm(false);
           setConfirmConfig(null);
@@ -307,26 +458,41 @@ export default function CustomerManagementModal({
       <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col no-scrollbar">
         {/* Create Area Toggle */}
         {!showCustomerForm && (
-          <div className="flex gap-3">
-            <button 
-              onClick={() => setShowCustomerForm(true)}
-              className="flex-1 bg-rose-500 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-rose-100 active:scale-95 transition-all flex items-center justify-center gap-2 border border-rose-600/10"
-            >
-              <Plus className="w-5 h-5 stroke-[3]" /> THÊM KHÁCH HÀNG MỚI
-            </button>
-            <button 
-              onClick={() => setShowGroupManagement(true)}
-              className="w-14 h-14 bg-white border border-rose-100 text-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-100/20 active:scale-95 transition-all"
-              title="Quản lý nhóm"
-            >
-              <Users className="w-6 h-6" />
-            </button>
-            <button 
-              onClick={() => setShowBulkImport(true)}
-              className="w-14 h-14 bg-white border border-rose-100 text-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-100/20 active:scale-95 transition-all"
-            >
-              <Save className="w-6 h-6" />
-            </button>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-pastel-subtext" />
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Tìm kiếm khách hàng theo tên, địa chỉ..."
+                className="w-full bg-pastel-bg border border-pastel-border rounded-2xl py-4 pl-12 pr-4 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-500/5 transition-all"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowCustomerForm(true)}
+                className="flex-1 bg-rose-500 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-rose-100 active:scale-95 transition-all flex items-center justify-center gap-2 border border-rose-600/10"
+              >
+                <Plus className="w-5 h-5 stroke-[3]" /> THÊM KHÁCH HÀNG MỚI
+              </button>
+              <button 
+                onClick={() => setShowGroupManagement(true)}
+                className="w-14 h-14 bg-white border border-rose-100 text-rose-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-100/20 active:scale-95 transition-all"
+                title="Quản lý nhóm"
+              >
+                <Users className="w-6 h-6" />
+              </button>
+              <button 
+                onClick={() => setShowBulkImport(true)}
+                className="w-14 h-14 bg-white border border-rose-100 text-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-100/20 active:scale-95 transition-all"
+              >
+                <Save className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -382,23 +548,42 @@ export default function CustomerManagementModal({
               </div>
               <div className="flex-1 space-y-3">
                 <div className="flex flex-col md:flex-row gap-3">
-                  <input 
-                    type="text" 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Họ và tên khách hàng..."
-                    className="flex-1 bg-white border border-rose-100 rounded-xl px-4 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-500/5 transition-all shadow-sm"
-                  />
-                  <select 
-                    value={selectedGroupId}
-                    onChange={(e) => setSelectedGroupId(e.target.value)}
-                    className="w-full md:w-32 bg-white border border-rose-100 rounded-xl px-2 py-3.5 text-xs font-bold outline-none"
-                  >
-                    <option value="">Nhóm...</option>
-                    {customerGroups.map(g => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
+                  <div className="flex-1">
+                    <label className="text-[10px] font-black text-pastel-subtext uppercase tracking-widest ml-1 mb-1 block">Tên khách hàng</label>
+                    <input 
+                      type="text" 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Họ và tên khách hàng..."
+                      className="w-full bg-white border border-rose-100 rounded-xl px-4 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-500/5 transition-all shadow-sm"
+                    />
+                  </div>
+                  <div className="w-full md:w-48">
+                    <label className="text-[10px] font-black text-pastel-subtext uppercase tracking-widest ml-1 mb-1 block">Nhóm</label>
+                    <select 
+                      value={selectedGroupId}
+                      onChange={(e) => setSelectedGroupId(e.target.value)}
+                      className="w-full bg-white border border-rose-100 rounded-xl px-2 py-3.5 text-xs font-bold outline-none h-[50px]"
+                    >
+                      <option value="">Nhóm...</option>
+                      {customerGroups.map(g => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-full md:w-48">
+                    <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest ml-1 mb-1 block">Số dư hiện tại</label>
+                    <input 
+                      type="text" 
+                      value={initialDebtStr === "" ? "" : Number(initialDebtStr).toLocaleString('vi-VN')}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setInitialDebtStr(val);
+                      }}
+                      placeholder="0"
+                      className="w-full bg-white border border-rose-100 rounded-xl px-4 py-3.5 text-sm font-black text-rose-500 outline-none focus:ring-4 focus:ring-rose-500/5 transition-all shadow-sm h-[50px]"
+                    />
+                  </div>
                 </div>
                 <div className="flex flex-col md:flex-row gap-3">
                   <input 
@@ -444,72 +629,161 @@ export default function CustomerManagementModal({
 
         {/* List Area */}
         <div className="flex-1 bg-white border border-pastel-border rounded-[32px] overflow-hidden flex flex-col shadow-sm">
-            <div className="flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0">
+          <div className="flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0 items-center">
             <div className="w-10 text-center">STT</div>
-            <div className="flex-1">Thông tin</div>
-            <div className="w-32 text-center">Số dư</div>
+            <div className="flex-1">Khách hàng</div>
+            <div className="hidden md:flex w-48 justify-center gap-1">
+              {last3Months.map(m => (
+                <div key={m.value} className="w-14 text-center text-[8px]">{m.label}</div>
+              ))}
+            </div>
+            <div className="w-24 md:w-32 text-right pr-4">Số dư</div>
             <div className="w-24 text-right">Thao tác</div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
+          <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 no-scrollbar">
             {paginatedCustomers.map((customer, index) => (
-              <div key={customer.id} className="flex items-center gap-4 p-4 hover:bg-pastel-bg/30 border-b border-pastel-border/30 last:border-0 transition-colors">
-                <span className="text-xs font-black text-pastel-subtext w-10 text-center">
-                  {(currentPage - 1) * pageSize + index + 1}
-                </span>
-                
-                <div className="flex-1 flex items-center gap-4">
+              <div key={customer.id} className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 p-3 md:p-4 hover:bg-pastel-bg/30 border-b border-pastel-border/30 last:border-0 transition-colors">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className="text-[10px] font-black text-pastel-subtext w-8 text-center shrink-0">
+                    {(currentPage - 1) * pageSize + index + 1}
+                  </span>
+                  
                   <div 
                     onClick={() => customer.imageUrl && setSelectedImageUrl(customer.imageUrl)}
-                    className="w-12 h-12 rounded-xl bg-pastel-bg overflow-hidden flex items-center justify-center shrink-0 cursor-pointer shadow-sm active:scale-95 transition-transform"
+                    className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-pastel-bg overflow-hidden flex items-center justify-center shrink-0 cursor-pointer shadow-sm active:scale-95 transition-transform"
                   >
                     {customer.imageUrl ? (
                       <img src={customer.imageUrl} alt={customer.name} className="w-full h-full object-cover" />
                     ) : (
-                      <User className="w-6 h-6 text-pastel-subtext/20" />
+                      <User className="w-5 h-5 md:w-6 md:h-6 text-pastel-subtext/20" />
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  
+                  <div className="flex-1 min-w-0 relative">
                     <span className="block font-black text-sm text-slate-700 truncate">{customer.name}</span>
-                    {(customer.address || customer.district || customer.city) && (
-                      <span className="block w-full text-[10px] text-slate-500 truncate leading-relaxed">
-                        {[customer.address, customer.district, customer.city].filter(Boolean).join(", ")}
+                    <div className="flex flex-col gap-0.5">
+                      {(customer.address || customer.district || customer.city) && (
+                        <span className="block w-full text-[9px] text-slate-500 truncate leading-tight">
+                          {[customer.address, customer.district, customer.city].filter(Boolean).join(", ")}
+                        </span>
+                      )}
+                      <span className="block text-[8px] font-bold text-rose-500 uppercase tracking-tighter">
+                        {customerGroups.find(g => g.id === customer.groupId)?.name || "Chưa phân nhóm"}
                       </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {customer.skinIssues?.map(id => {
+                        const si = skinIssues.find(s => s.id === id);
+                        return si ? <span key={id} className="bg-amber-100 text-amber-700 font-bold text-[9px] px-1.5 py-0.5 rounded-md">{si.name}</span> : null;
+                      })}
+                      <button 
+                        onClick={() => setSkinIssueDropdownFor(skinIssueDropdownFor === customer.id ? null : customer.id)}
+                        className="text-[9px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-1.5 py-0.5 rounded-md transition-colors"
+                      >
+                        + Tình trạng da
+                      </button>
+                    </div>
+
+                    {skinIssueDropdownFor === customer.id && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setSkinIssueDropdownFor(null)} />
+                        <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-pastel-border rounded-xl shadow-xl z-50 p-2 py-2 max-h-48 overflow-y-auto">
+                          {skinIssues.length === 0 ? (
+                            <p className="text-xs text-slate-400 p-2 text-center">Chưa có vấn đề da nào.</p>
+                          ) : (
+                            skinIssues.map(issue => {
+                              const isSelected = customer.skinIssues?.includes(issue.id);
+                              return (
+                                <button
+                                  key={issue.id}
+                                  onClick={() => {
+                                    const curr = customer.skinIssues || [];
+                                    const next = isSelected ? curr.filter(id => id !== issue.id) : [...curr, issue.id];
+                                    onUpdateCustomers(customers.map(c => c.id === customer.id ? { ...c, skinIssues: next } : c));
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs font-bold rounded-lg flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                >
+                                  <span className={isSelected ? "text-amber-600" : "text-slate-600"}>{issue.name}</span>
+                                  {isSelected && <CheckCircle2 className="w-3 h-3 text-amber-500" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </>
                     )}
-                    <span className="block text-[9px] font-bold text-pastel-subtext uppercase tracking-tight mt-0.5">
-                      {customerGroups.find(g => g.id === customer.groupId)?.name || "Chưa phân nhóm"}
-                    </span>
                   </div>
-                  <div className="w-32 text-center">
+                </div>
+
+                <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-pastel-border/30 pt-3 md:pt-0">
+                  {/* Skin Check - last 3 months */}
+                  <div className="flex gap-1">
+                    {last3Months.map(month => {
+                      const exam = skinAudits.find(e => e.customerId === customer.id && e.month === month.value && e.type === 'Khám');
+                      const check = skinAudits.find(e => e.customerId === customer.id && e.month === month.value && e.type === 'Kiểm tra');
+                      return (
+                        <div key={month.value} className="flex flex-col gap-0.5">
+                          <button 
+                            onClick={() => handleToggleSkinAudit(customer.id, month.value, 'Khám')}
+                            className={cn(
+                              "w-7 h-5 rounded-[4px] flex items-center justify-center transition-all",
+                              exam ? "bg-rose-500 text-white shadow-sm" : "bg-pastel-bg border border-pastel-border/50 text-pastel-subtext/30"
+                            )}
+                            title={`Khám ${month.label}`}
+                          >
+                            <Stethoscope className="w-3 h-3" />
+                          </button>
+                          <button 
+                            onClick={() => handleToggleSkinAudit(customer.id, month.value, 'Kiểm tra')}
+                            className={cn(
+                              "w-7 h-5 rounded-[4px] flex items-center justify-center transition-all",
+                              check ? "bg-emerald-500 text-white shadow-sm" : "bg-pastel-bg border border-pastel-border/50 text-pastel-subtext/30"
+                            )}
+                            title={`Kiểm tra ${month.label}`}
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="w-24 md:w-32 text-right shrink-0">
                     <span className={cn(
-                      "font-black text-sm",
-                      getCustomerBalance(customer.id) >= 0 ? "text-slate-700" : "text-rose-500"
+                      "font-black text-sm block leading-none",
+                      getCustomerBalance(customer.id) > 0 ? "text-rose-500" : (getCustomerBalance(customer.id) < 0 ? "text-emerald-500" : "text-slate-400")
                     )}>
                       {getCustomerBalance(customer.id).toLocaleString('vi-VN')}
                     </span>
+                    <span className="text-[8px] font-bold text-pastel-subtext uppercase block mt-1 tracking-tighter">Số dư</span>
                   </div>
+
                   <div className={cn(
-                    "flex items-center gap-1.5 shrink-0 justify-end w-24",
+                    "flex items-center gap-1 shrink-0 justify-end w-24 md:w-32",
                     editingId === customer.id && "opacity-20 pointer-events-none"
                   )}>
                     <button 
-                      onClick={() => onViewDebtHistory(customer.id)}
-                      className="p-2.5 text-amber-500 bg-white border border-amber-100 rounded-xl shadow-sm hover:bg-amber-50 active:scale-90 transition-all cursor-pointer relative z-10"
-                      title="Lịch sử công nợ"
+                      onClick={() => handleEdit(customer)}
+                      className="p-2 text-violet-500 bg-white border border-violet-100 rounded-lg shadow-sm hover:bg-violet-50 active:scale-90 transition-all cursor-pointer"
+                      title="Sửa thông tin"
                     >
-                      <History className="w-4 h-4" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button 
-                      onClick={() => handleEdit(customer)}
-                      className="p-2.5 text-violet-500 bg-white border border-violet-100 rounded-xl shadow-sm hover:bg-violet-50 active:scale-90 transition-all cursor-pointer relative z-10"
+                      onClick={() => onViewDebtHistory(customer.id)}
+                      className="p-2 text-amber-500 bg-white border border-amber-100 rounded-lg shadow-sm hover:bg-amber-50 active:scale-90 transition-all cursor-pointer"
+                      title="Lịch sử công nợ"
                     >
-                      <Pencil className="w-4 h-4" />
+                      <History className="w-3.5 h-3.5" />
                     </button>
                     <button 
                       onClick={() => handleDelete(customer.id)}
-                      className="p-2.5 text-rose-500 bg-white border border-rose-100 rounded-xl shadow-sm hover:bg-rose-50 active:scale-90 transition-all cursor-pointer relative z-10"
+                      className="p-2 text-rose-500 bg-white border border-rose-100 rounded-lg shadow-sm hover:bg-rose-50 active:scale-90 transition-all cursor-pointer"
+                      title="Xóa khách hàng"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

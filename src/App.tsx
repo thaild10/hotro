@@ -34,30 +34,33 @@ export default function App() {
     return () => unsubscribeAuth();
   }, []);
 
-  // Real-time data sync
+  // Real-time data sync using custom API
   useEffect(() => {
     if (!user) return;
 
-    // Use a shared document for all 3 users
-    const docRef = doc(db, "appdata", "shared_kanban");
-    
-    const unsubscribeData = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setAppData(docSnap.data() as AppData);
-      } else {
-        // Initialize shared data if it doesn't exist
-        const initialData: AppData = {
-          cards: [],
-          tagsConfig: DEFAULT_TAGS,
-        };
-        setDoc(docRef, initialData);
-        setAppData(initialData);
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/data");
+        const data = await res.json();
+        // If data is empty, initialize with defaults
+        if (Object.keys(data).length === 0) {
+          const initialData: AppData = {
+            cards: [],
+            tagsConfig: DEFAULT_TAGS,
+          };
+          setAppData(initialData);
+        } else {
+          setAppData(data as AppData);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
       }
-    }, (error) => {
-      console.error("Error syncing data:", error);
-    });
+    };
 
-    return () => unsubscribeData();
+    fetchData();
+    // Poll every 10 seconds for shared updates
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
   }, [user]);
 
   const handleLoginSuccess = (newUsername: string) => {

@@ -183,7 +183,7 @@ export default function CardEditModal({
 
           {availableTags.length > 0 && (
             <div>
-              <label className="text-[11px] font-bold text-pastel-subtext uppercase ml-1 mb-1 block">Chọn Tag</label>
+              <label className="text-[11px] font-bold text-pastel-subtext uppercase ml-1 mb-1 block">Gắn tag</label>
               <div className="flex flex-wrap gap-2">
                 {availableTags.map((tag, idx) => {
                   const isSelected = selectedTags.includes(tag.text);

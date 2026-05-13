@@ -49,6 +49,7 @@ interface LedgerModalProps {
   onUpdatePurposes: (purposes: LedgerPurpose[]) => void;
   onUpdateTransactions: (transactions: LedgerTransaction[]) => void;
   onUpdateLogs: (logs: LedgerLog[]) => void;
+  onUpdateCustomers: (customers: Customer[]) => void;
   onClose: () => void;
   onAddCardLog?: (customerName: string, action: string) => void;
   deviceView?: 'desktop' | 'mobile';
@@ -68,34 +69,24 @@ export default function LedgerModal({
   onUpdatePurposes,
   onUpdateTransactions,
   onUpdateLogs,
+  onUpdateCustomers,
   onClose,
   onAddCardLog,
   deviceView = 'desktop',
   isPage = false,
   initialCustomerDebtId = null
 }: LedgerModalProps) {
-  const [activeView, setActiveView] = useState<'transactions' | 'accounts' | 'purposes' | 'logs' | 'debt'>('transactions');
+  const [activeView, setActiveView] = useState<'transactions' | 'accounts' | 'purposes' | 'logs'>('transactions');
   const [activeTab, setActiveTab] = useState<'Thu' | 'Chi'>('Thu');
   const [isCreatingAction, setIsCreatingAction] = useState<'Thu' | 'Chi' | null>(null);
   const [debtSort, setDebtSort] = useState<'balance-desc' | 'balance-asc' | 'name-asc' | 'name-desc'>('balance-desc');
   const [selectedDebtHistory, setSelectedDebtHistory] = useState<Customer | null>(null);
 
   React.useEffect(() => {
-    if (initialCustomerDebtId) {
-      const cust = customers.find(c => c.id === initialCustomerDebtId);
-      if (cust) {
-        setActiveView('debt');
-        setSelectedDebtHistory(cust);
-      }
-    }
+    // If initialCustomerDebtId is provided, we should probably redirect elsewhere, 
+    // but for now we just avoid the crash. In KanbanApp, this will be handled.
   }, [initialCustomerDebtId, customers]);
 
-  const debtHistory = useMemo(() => {
-    if (!selectedDebtHistory) return [];
-    return logs.filter(l => l.message.includes(`công nợ cho ${selectedDebtHistory.name}`) || l.message.includes(`số dư công nợ`) && l.message.includes(selectedDebtHistory.name));
-  }, [logs, selectedDebtHistory]);
-  
-  // States for forms
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [accountName, setAccountName] = useState("");
@@ -139,35 +130,6 @@ export default function LedgerModal({
     return accounts.reduce((sum, acc) => sum + (accountBalances[acc.id] || 0), 0);
   }, [accounts, accountBalances]);
 
-  const customerDebts = useMemo(() => {
-    const debts: Record<string, number> = {};
-    customers.forEach(c => {
-      const chi = transactions
-        .filter(t => t.customerId === c.id && t.type === 'Chi')
-        .reduce((sum, t) => sum + t.amount, 0);
-      const thu = transactions
-        .filter(t => t.customerId === c.id && t.type === 'Thu')
-        .reduce((sum, t) => sum + t.amount, 0);
-      debts[c.id] = chi - thu;
-    });
-    return debts;
-  }, [customers, transactions]);
-
-  const sortedCustomerDebts = useMemo(() => {
-    const list = customers.map(c => ({
-      ...c,
-      balance: customerDebts[c.id] || 0
-    }));
-
-    switch (debtSort) {
-      case 'balance-desc': return list.sort((a, b) => b.balance - a.balance);
-      case 'balance-asc': return list.sort((a, b) => a.balance - b.balance);
-      case 'name-asc': return list.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-      case 'name-desc': return list.sort((a, b) => b.name.localeCompare(a.name, 'vi'));
-      default: return list;
-    }
-  }, [customers, customerDebts, debtSort]);
-
   const sortedTransactions = useMemo(() => {
     return [...transactions]
       .filter(t => t.type === activeTab)
@@ -201,11 +163,6 @@ export default function LedgerModal({
     return logs.slice(start, start + pageSize);
   }, [logs, currentPage, pageSize]);
 
-  const paginatedCustomerDebts = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sortedCustomerDebts.slice(start, start + pageSize);
-  }, [sortedCustomerDebts, currentPage, pageSize]);
-
   const addLog = (action: string, targetType: LedgerLog['targetType'], message: string) => {
     const newLog: LedgerLog = {
       id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -218,51 +175,8 @@ export default function LedgerModal({
     onUpdateLogs([newLog, ...logs]);
   };
 
-  const [isEditingDebt, setIsEditingDebt] = useState<{ id: string, name: string, balance: number } | null>(null);
-  const [debtEditValue, setDebtEditValue] = useState("");
-
   const cleanAmount = (val: string) => {
     return val.replace(/\./g, "").replace(/,/g, "");
-  };
-
-  const handleSaveDebtAdjustment = () => {
-    if (!isEditingDebt) return;
-    const cleaned = cleanAmount(debtEditValue);
-    const targetBalance = parseFloat(cleaned) || 0;
-    const diff = targetBalance - isEditingDebt.balance;
-    
-    if (diff === 0) {
-      setIsEditingDebt(null);
-      return;
-    }
-
-    const adjPurpose = purposes.find(p => p.name === 'Chỉnh số dư');
-    const defaultAccount = accounts[0];
-
-    if (!adjPurpose || !defaultAccount) {
-      alert("Lỗi: Không tìm thấy mục đích 'Chỉnh số dư' hoặc tài khoản hợp lệ.");
-      return;
-    }
-
-    const newTx: LedgerTransaction = {
-      id: `tx-adj-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      accountId: defaultAccount.id,
-      purposeId: adjPurpose.id,
-      amount: Math.abs(diff),
-      date: getTodayIso(),
-      reason: `Chỉnh số dư công nợ (Từ ${isEditingDebt.balance.toLocaleString('vi-VN')} -> ${targetBalance.toLocaleString('vi-VN')})`,
-      type: diff > 0 ? 'Chi' : 'Thu',
-      createdAt: Date.now(),
-      customerId: isEditingDebt.id
-    };
-
-    onUpdateTransactions([newTx, ...transactions]);
-    const logMsg = `Chỉnh công nợ cho ${isEditingDebt.name}: ${isEditingDebt.balance.toLocaleString('vi-VN')} -> ${targetBalance.toLocaleString('vi-VN')}`;
-    addLog("Sửa", "Giao dịch", logMsg);
-    onAddCardLog?.(isEditingDebt.name, logMsg);
-    
-    setIsEditingDebt(null);
-    setDebtEditValue("");
   };
 
   const handlePinConfirm = async () => {
@@ -530,15 +444,6 @@ export default function LedgerModal({
             )}
           >
             <HistoryIcon className="w-4 h-4" /> Lịch sử
-          </button>
-          <button 
-            onClick={() => setActiveView('debt')}
-            className={cn(
-              "px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2",
-              activeView === 'debt' ? "bg-rose-600 text-white shadow-lg" : "text-pastel-subtext hover:bg-pastel-bg"
-            )}
-          >
-            <Users className="w-4 h-4" /> Công nợ
           </button>
         </div>
 
@@ -879,125 +784,8 @@ export default function LedgerModal({
             </div>
           )}
 
-          {activeView === 'debt' && (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-6 border-b border-pastel-border bg-white flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
-                <h3 className="font-black text-slate-800 uppercase tracking-wider text-sm flex items-center gap-2">
-                  <Users className="w-5 h-5 text-rose-500" /> Công nợ khách hàng
-                </h3>
-                <div className="flex flex-wrap gap-2 bg-pastel-bg p-1 rounded-xl">
-                  {[
-                    { id: 'balance-desc', label: 'Dư cao - thấp', icon: SortDesc },
-                    { id: 'balance-asc', label: 'Dư thấp - cao', icon: SortAsc },
-                    { id: 'name-asc', label: 'Tên A - Z', icon: SortAsc },
-                    { id: 'name-desc', label: 'Tên Z - A', icon: SortDesc },
-                  ].map(sort => (
-                    <button 
-                      key={sort.id}
-                      onClick={() => setDebtSort(sort.id as any)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all flex items-center gap-1.5",
-                        debtSort === sort.id ? "bg-white text-rose-500 shadow-sm" : "text-pastel-subtext hover:bg-white/50"
-                      )}
-                    >
-                      <sort.icon className="w-3 h-3" /> {sort.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
-                <div className="bg-white border border-pastel-border rounded-[32px] overflow-hidden shadow-sm">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="sticky top-0 bg-white z-10">
-                      <tr className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest bg-pastel-bg/50">
-                        <th className="py-4 pl-6 w-16 text-center">STT</th>
-                        <th className="py-4">Khách hàng</th>
-                        <th className="py-4 text-right pr-6 md:pr-10">Số dư hiện tại</th>
-                        <th className="py-4 text-center w-24">Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-pastel-border/30">
-                      {paginatedCustomerDebts.map((cust, idx) => (
-                        <tr key={cust.id} className="hover:bg-rose-50/20 transition-colors group">
-                          <td className="py-4 pl-6 text-center text-xs font-black text-pastel-subtext">
-                            {(currentPage - 1) * pageSize + idx + 1}
-                          </td>
-                          <td className="py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-pastel-bg overflow-hidden flex items-center justify-center shrink-0 border border-pastel-border shadow-sm">
-                                {cust.imageUrl ? (
-                                  <img src={cust.imageUrl} alt={cust.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <User className="w-5 h-5 text-pastel-subtext/30" />
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <h4 className="font-black text-slate-800 text-sm truncate">{cust.name}</h4>
-                                <p className="text-[9px] font-bold text-pastel-subtext uppercase tracking-wider truncate">
-                                  {cust.city || cust.district ? `${cust.district || ''} ${cust.city || ''}` : "Chưa có địa chỉ"}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 text-right pr-6 md:pr-10">
-                            <span className={cn(
-                              "font-black text-sm",
-                              cust.balance > 0 ? "text-rose-500" : (cust.balance < 0 ? "text-emerald-500" : "text-slate-400")
-                            )}>
-                              {cust.balance.toLocaleString('vi-VN')} <span className="text-[10px] text-pastel-subtext ml-0.5">đ</span>
-                            </span>
-                          </td>
-                          <td className="py-4 text-center px-4">
-                            <div className="flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => {
-                                  setSelectedDebtHistory(cust);
-                                }}
-                                className="p-2 text-indigo-500 bg-indigo-50 hover:bg-indigo-100 rounded-lg shadow-sm border border-indigo-100 transition-all active:scale-90"
-                                title="Xem lịch sử đổi công nợ"
-                              >
-                                <HistoryIcon className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => {
-                                  setIsEditingDebt({ id: cust.id, name: cust.name, balance: cust.balance });
-                                  setDebtEditValue(cust.balance.toString());
-                                }}
-                                className="p-2 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-lg shadow-sm border border-rose-100 transition-all active:scale-90"
-                                title="Sửa số dư"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {sortedCustomerDebts.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="py-20 text-center italic text-pastel-subtext">Chưa có khách hàng</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                {sortedCustomerDebts.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-pastel-border">
-                    <Pagination 
-                      currentPage={currentPage}
-                      totalPages={Math.ceil(sortedCustomerDebts.length / pageSize)}
-                      pageSize={pageSize}
-                      onPageChange={setCurrentPage}
-                      onPageSizeChange={setPageSize}
-                      totalItems={sortedCustomerDebts.length}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
-
+        
         {/* Transaction Creation Overlay */}
         <AnimatePresence>
           {isCreatingAction && (
@@ -1192,122 +980,12 @@ export default function LedgerModal({
             </motion.div>
           )}
 
-          {/* Debt History Modal */}
-      <AnimatePresence>
-        {selectedDebtHistory && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[2100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
-            >
-              <div className="p-6 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center">
-                    <HistoryIcon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-slate-800 text-lg uppercase tracking-wider">Lịch sử công nợ</h3>
-                    <p className="text-xs font-bold text-indigo-600 uppercase">{selectedDebtHistory.name}</p>
-                  </div>
-                </div>
-                <button onClick={() => setSelectedDebtHistory(null)} className="p-2 hover:bg-white/50 rounded-xl transition-colors">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
-                {debtHistory.length > 0 ? debtHistory.map(log => (
-                  <div key={log.id} className="p-4 bg-pastel-bg/40 rounded-2xl border border-pastel-border/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <User className="w-3 h-3" /> {log.user}
-                      </span>
-                      <span className="text-[10px] font-medium text-pastel-subtext font-mono">
-                        {log.timestamp}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-slate-600 line-clamp-3">{log.message}</p>
-                  </div>
-                )) : (
-                  <div className="text-center py-10 text-pastel-subtext italic">Không có lịch sử thay đổi công nợ cho khách này</div>
-                )}
-              </div>
-
-              <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                <button 
-                  onClick={() => setSelectedDebtHistory(null)}
-                  className="px-8 py-3 bg-white border border-slate-200 text-slate-600 font-black rounded-xl active:scale-95 transition-all text-sm shadow-sm"
-                >
-                  Đóng
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {confirmConfig && (
+          {confirmConfig && (
             <ConfirmDialog 
               message={confirmConfig.message}
               onConfirm={confirmConfig.action}
               onCancel={() => setConfirmConfig(null)}
             />
-          )}
-
-          {isEditingDebt && (
-            <motion.div className="absolute inset-0 flex items-center justify-center bg-black/60 z-[1400] p-4 backdrop-blur-sm">
-              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl relative">
-                <h3 className="text-lg font-black text-slate-800 mb-2 flex items-center gap-2">
-                  <Users className="w-6 h-6 text-rose-500" /> Chỉnh số dư công nợ
-                </h3>
-                <p className="text-xs font-bold text-pastel-subtext uppercase tracking-widest mb-6">Khách: {isEditingDebt.name}</p>
-                
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1 mb-1.5 block">Số dư mới (VNĐ)</label>
-                    <input 
-                      type="text" 
-                      value={debtEditValue ? Number(debtEditValue).toLocaleString('vi-VN') : ""} 
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9-]/g, '');
-                        setDebtEditValue(val);
-                      }} 
-                      className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-4 text-xl font-black text-rose-500 outline-none focus:border-rose-300" 
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="p-3 bg-pastel-bg/50 rounded-xl text-[10px] font-medium text-pastel-subtext italic">
-                    Hệ thống sẽ tự động tạo một phiếu Thu/Chi tương ứng với mục đích "Chỉnh số dư" để khớp với số tiền bạn nhập.
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => setIsEditingDebt(null)} 
-                    className="flex-1 py-3 font-bold text-slate-400 bg-slate-50 border border-slate-100 rounded-xl active:scale-95 transition-all"
-                  >
-                    Hủy
-                  </button>
-                  <button 
-                    onClick={() => {
-                      confirmAction(`Xác nhận chỉnh số dư cho ${isEditingDebt.name}?`, () => {
-                        handleSaveDebtAdjustment();
-                      });
-                    }} 
-                    className="flex-1 py-3 font-black text-white bg-rose-500 rounded-xl shadow-lg shadow-rose-100 active:scale-95 transition-all"
-                  >
-                    Lưu
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
           )}
         </AnimatePresence>
       </motion.div>

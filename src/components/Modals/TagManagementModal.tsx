@@ -104,8 +104,8 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
               <Plus className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-slate-800 leading-tight">Quản lý Tag</h2>
-              <p className="text-[9px] font-bold text-violet-600 uppercase tracking-wider">Cấu hình thẻ phân loại</p>
+              <h2 className="text-lg font-black text-slate-800 leading-tight">Quản lý tag</h2>
+              <p className="text-[9px] font-bold text-violet-600 uppercase tracking-wider">Quản lý thẻ phân loại</p>
             </div>
           </div>
         </div>
@@ -119,7 +119,7 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
           return (
             <div key={id} className="p-4 bg-pastel-bg rounded-3xl border border-pastel-border shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-black text-violet-500 uppercase tracking-wider">{name}</span>
+                <span className="text-xs font-black text-violet-500 tracking-wider">{name}</span>
                 <button 
                   onClick={() => {
                     setEditingTabId(tabId);

@@ -142,15 +142,35 @@ export default function Card({
         
         <div className="flex items-center gap-2 shrink-0">
           {!isCollapsed && (
-            <button 
-              onClick={onDoctorReply} 
-              className={cn(
-                "text-[10px] font-black text-violet-500 bg-violet-50 px-3 py-2 rounded-xl flex items-center gap-1 border border-violet-100 active:scale-95 transition-all",
-                card.doctorText && !card.doctorHidden && "opacity-40"
+            <div className="flex items-center gap-2">
+              {card.doctorText && !card.doctorHidden && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!card.replyAgain) updateCard(card.id, { replyAgain: true });
+                  }}
+                  className={cn(
+                    "text-[10px] font-black px-3 py-2 rounded-xl border transition-all h-9",
+                    card.replyAgain 
+                      ? "bg-slate-100 text-slate-400 border-slate-200 pointer-events-none" 
+                      : "text-sky-500 bg-sky-50 border-sky-100 active:scale-95"
+                  )}
+                >
+                  Trả lời tiếp
+                </button>
               )}
-            >
-              <Stethoscope className="w-3.5 h-3.5 fill-current" /> Bác sĩ
-            </button>
+              <button 
+                onClick={onDoctorReply} 
+                className={cn(
+                  "text-[10px] font-black px-3 py-2 rounded-xl flex items-center gap-1 border active:scale-95 transition-all h-9",
+                  (card.doctorText && !card.doctorHidden && !card.replyAgain) 
+                    ? "bg-violet-50 text-violet-300 border-violet-50 pointer-events-none opacity-50" 
+                    : "bg-violet-50 text-violet-500 border-violet-100"
+                )}
+              >
+                <Stethoscope className="w-3.5 h-3.5 fill-current" /> Bác sĩ trả lời
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -190,41 +210,61 @@ export default function Card({
             onClick={onNoteEdit} 
             className="text-xs font-bold text-rose-500 mt-2 flex items-center gap-1.5 active:opacity-70 py-2"
           >
-            <Notebook className="w-4 h-4" /> Sửa ghi chú
+            <Notebook className="w-4 h-4" /> Sửa nội dung
           </button>
         </div>
 
-        {card.doctorText && !card.doctorHidden && (
-          <div className="bg-violet-50/50 border-l-4 border-violet-300 p-4 rounded-r-2xl mt-2 relative">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-black text-violet-500">{card.doctorDate}</span>
-              <span className="text-xs font-black text-violet-500">Bác sĩ phản hồi:</span>
+        {(() => {
+          if (card.doctorHidden || !card.doctorText) return null;
+          const replies = card.doctorReplies || [{ text: card.doctorText, date: card.doctorDate || '' }];
+          return (
+            <div className="space-y-2 mt-2">
+              {replies.map((reply, idx) => {
+                const isLate = idx === replies.length - 1;
+                const formattedDate = reply.date ? reply.date.split('.').slice(0, 2).join('.') : '';
+                return (
+                  <div key={idx} className={cn(
+                    "border-l-4 p-4 rounded-r-2xl relative",
+                    isLate ? "bg-violet-50/50 border-violet-300" : "bg-slate-50 border-slate-200"
+                  )}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={cn("text-xs font-black", isLate ? "text-violet-500" : "text-slate-400")}>{formattedDate}</span>
+                      <span className={cn("text-xs font-black", isLate ? "text-violet-500" : "text-slate-400")}>Bác sĩ trả lời:</span>
+                    </div>
+                    <p className={cn(
+                      "text-sm mb-3 whitespace-pre-line font-medium",
+                      isLate ? "text-pastel-text/90 italic" : "text-slate-400"
+                    )}>
+                      {reply.text}
+                    </p>
+                    {isLate && (
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={onDoctorReply} 
+                          className="px-3 py-2 rounded-xl bg-white border border-violet-200 text-violet-500 font-bold text-xs active:scale-95 min-h-[36px]"
+                        >
+                          Sửa
+                        </button>
+                        {card.notified ? (
+                          <span className="bg-teal-50 text-teal-600 border border-teal-200 px-3 py-2 rounded-xl font-bold text-xs min-h-[36px] flex items-center">
+                            {card.notifiedTime}
+                          </span>
+                        ) : (
+                          <button 
+                            onClick={handleNotify}
+                            className="px-3 py-2 rounded-xl bg-rose-400 text-white font-black text-xs active:scale-95 min-h-[36px]"
+                          >
+                            Báo khách
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <p className="text-sm line-clamp-2 mb-3 whitespace-pre-line text-pastel-text/90 font-medium italic">
-              {card.doctorText}
-            </p>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={onDoctorReply} 
-                className="px-3 py-2 rounded-xl bg-white border border-violet-200 text-violet-500 font-bold text-xs active:scale-95 min-h-[36px]"
-              >
-                Sửa
-              </button>
-              {card.notified ? (
-                <span className="bg-teal-50 text-teal-600 border border-teal-200 px-3 py-2 rounded-xl font-bold text-xs min-h-[36px] flex items-center">
-                  {card.notifiedTime}
-                </span>
-              ) : (
-                <button 
-                  onClick={handleNotify}
-                  className="px-3 py-2 rounded-xl bg-rose-400 text-white font-black text-xs active:scale-95 min-h-[36px]"
-                >
-                  Báo khách
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {card.images && card.images.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-2">

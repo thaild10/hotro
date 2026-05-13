@@ -29,7 +29,7 @@ export function Pagination({ currentPage, totalPages, pageSize, onPageChange, on
           <option value={10}>10</option>
           <option value={50}>50</option>
         </select>
-        <span>dòng / trang</span>
+        <span>dòng</span>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-1.5">

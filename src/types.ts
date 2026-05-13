@@ -29,9 +29,11 @@ export interface KanbanCard {
   collapsed?: boolean;
   doctorText?: string;
   doctorDate?: string;
+  doctorReplies?: { text: string; date: string }[];
   doctorHidden?: boolean;
   notified?: boolean;
   notifiedTime?: string;
+  replyAgain?: boolean;
   tags: string[];
   logs: string[];
   products?: CardProduct[];
@@ -51,6 +53,8 @@ export interface Customer {
   city?: string;
   district?: string;
   address?: string;
+  initialDebt?: number;
+  skinIssues?: string[];
 }
 
 export interface UserAccount {
@@ -62,6 +66,11 @@ export interface UserAccount {
 }
 
 export interface Brand {
+  id: string;
+  name: string;
+}
+
+export interface SkinIssue {
   id: string;
   name: string;
 }
@@ -87,6 +96,8 @@ export interface Product {
     description?: string;
     strength?: string;
     daysToUse?: number;
+    mfgDate?: string;
+    expDate?: string;
   };
 }
 
@@ -181,6 +192,7 @@ export interface AppData {
   customerGroups?: CustomerGroup[];
   users?: UserAccount[];
   brands?: Brand[];
+  skinIssues?: SkinIssue[];
   productCategories?: ProductCategory[];
   products?: Product[];
   skinAudits?: SkinAuditEntry[];
@@ -201,6 +213,8 @@ export interface OrderItem {
   unitPrice: number;
   discount: number;
   subtotal: number;
+  mfgDate?: string;
+  expDate?: string;
 }
 
 export interface Order {

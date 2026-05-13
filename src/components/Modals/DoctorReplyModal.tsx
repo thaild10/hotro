@@ -10,7 +10,13 @@ interface DoctorReplyModalProps {
 }
 
 export default function DoctorReplyModal({ card, onClose, onSave }: DoctorReplyModalProps) {
-  const [reply, setReply] = useState(card.doctorText || "");
+  const [reply, setReply] = useState(() => {
+    if (card.replyAgain) return "";
+    if (card.doctorReplies && card.doctorReplies.length > 0) {
+      return card.doctorReplies[card.doctorReplies.length - 1].text;
+    }
+    return card.doctorText || "";
+  });
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
