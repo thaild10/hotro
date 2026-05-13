@@ -20,34 +20,49 @@ const dbConfig = {
   database: process.env.DB_NAME || "chamdavn6a04_hotro",
 };
 
-let pool: mysql.Pool;
+let pool: mysql.Pool | null = null;
+let memoryStore: Record<string, any> = {};
 
 async function initDb() {
   try {
     pool = mysql.createPool(dbConfig);
-    console.log("Connected to MySQL database");
+    console.log("Connecting to MySQL database...");
 
+    // Test connection
+    const conn = await pool.getConnection();
+    console.log("Database connection successful");
+    
     // Create table for app state if it doesn't exist
-    await pool.execute(`
+    await conn.execute(`
       CREATE TABLE IF NOT EXISTS app_state (
         id VARCHAR(50) PRIMARY KEY,
         data LONGTEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
+    conn.release();
   } catch (error) {
-    console.error("Database initialization failed:", error);
+    console.error("Database initialization failed (using memory fallback):", error);
+    pool = null;
   }
 }
 
 // API Routes
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", db: !!pool ? "connected" : "memory" });
+});
+
 app.get("/api/data", async (req, res) => {
   try {
-    const [rows]: any = await pool.execute("SELECT data FROM app_state WHERE id = 'main'");
-    if (rows.length > 0) {
-      res.json(JSON.parse(rows[0].data));
+    if (pool) {
+      const [rows]: any = await pool.execute("SELECT data FROM app_state WHERE id = 'main'");
+      if (rows.length > 0) {
+        return res.json(JSON.parse(rows[0].data));
+      }
+      return res.json({});
     } else {
-      res.json({});
+      // Fallback
+      return res.json(memoryStore['main'] || {});
     }
   } catch (error) {
     console.error("Error fetching data:", error);
@@ -57,11 +72,16 @@ app.get("/api/data", async (req, res) => {
 
 app.post("/api/data", async (req, res) => {
   try {
-    const dataString = JSON.stringify(req.body);
-    await pool.execute(
-      "INSERT INTO app_state (id, data) VALUES ('main', ?) ON DUPLICATE KEY UPDATE data = ?",
-      [dataString, dataString]
-    );
+    if (pool) {
+      const dataString = JSON.stringify(req.body);
+      await pool.execute(
+        "INSERT INTO app_state (id, data) VALUES ('main', ?) ON DUPLICATE KEY UPDATE data = ?",
+        [dataString, dataString]
+      );
+    } else {
+      // Fallback
+      memoryStore['main'] = req.body;
+    }
     res.json({ success: true });
   } catch (error) {
     console.error("Error saving data:", error);
@@ -80,9 +100,13 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    // Determine static path robustly
+    // When running from dist/server.cjs, __dirname is the dist folder
+    const distPath = __dirname;
+    
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      // Check if file exists to prevent loops
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
