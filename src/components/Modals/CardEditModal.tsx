@@ -86,9 +86,9 @@ export default function CardEditModal({
       const file = new File([croppedBlob], "cropped.jpg", { type: "image/jpeg" });
       const url = await uploadToFirebase(file, 'kanban', compressionSettings);
       setImages(prev => [...prev, url]);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upload error:", err);
-      alert("Upload ảnh thất bại!");
+      alert(err instanceof Error ? err.message : "Upload ảnh thất bại!");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

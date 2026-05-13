@@ -75,10 +75,16 @@ export const uploadToFirebase = async (
   folder: 'products' | 'customers' | 'kanban', 
   settings?: CompressionSettings
 ): Promise<string> => {
-  let blob: Blob | File = file;
-  if (settings) {
-    blob = await compressImage(file, settings);
+  // Enforce 1MB limit for the initial file
+  const MAX_SIZE = 1 * 1024 * 1024; // 1MB
+  if (file.size > MAX_SIZE) {
+    throw new Error(`Ảnh "${file.name}" quá lớn (${(file.size / (1024 * 1024)).toFixed(2)}MB). Giới hạn tối đa là 1MB.`);
   }
+
+  // Use a default compression if none provided to ensure ALL images are compressed
+  const finalSettings = settings || { maxWidth: 1200, quality: 80 };
+  
+  const blob = await compressImage(file, finalSettings);
   
   const storageRef = ref(storage, `${folder}/${Date.now()}_${file.name}`);
   const snapshot = await uploadBytes(storageRef, blob);

@@ -164,6 +164,12 @@ export default function CustomerManagementModal({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const MAX_SIZE = 1 * 1024 * 1024;
+      if (file.size > MAX_SIZE) {
+        alert(`Ảnh quá lớn (${(file.size / (1024 * 1024)).toFixed(2)}MB). Giới hạn tối đa là 1MB.`);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => {
         setCropperData(reader.result as string);
