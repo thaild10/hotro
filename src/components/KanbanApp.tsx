@@ -54,6 +54,8 @@ import {
   ImportOrder,
   SkinIssue
 } from "../types";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import Card from "./Card";
 import CardEditModal from "./Modals/CardEditModal";
 import TagManagementModal from "./Modals/TagManagementModal";
@@ -386,18 +388,19 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const performSave = async () => {
         setSaveStatus("saving");
         try {
-          await fetch("/api/data", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(normalizedLocal)
-          });
+          const docRef = doc(db, "appdata", "shared_kanban");
+          await setDoc(docRef, normalizedLocal);
           setSaveStatus("saved");
           
           // Clear status after 3 seconds
           setTimeout(() => setSaveStatus("idle"), 3000);
         } catch (error: any) {
           console.error("Save error:", error);
-          setSaveStatus("error");
+          if (error?.code === 'resource-exhausted' || error?.message?.includes('Quota exceeded')) {
+            setSaveStatus("quota-exceeded");
+          } else {
+            setSaveStatus("error");
+          }
         }
       };
 
