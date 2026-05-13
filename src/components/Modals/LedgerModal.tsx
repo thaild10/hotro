@@ -35,6 +35,9 @@ import { cn, getTimeFormatted, getTodayFormatted, getTodayIso, formatIsoToPretty
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Pagination } from "../Pagination";
 
+import { auth } from "../../firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+
 interface LedgerModalProps {
   accounts: LedgerAccount[];
   purposes: LedgerPurpose[];
@@ -184,12 +187,9 @@ export default function LedgerModal({
     
     if (!isValid) {
       try {
-        const response = await fetch("/api/verify-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password: pinValue })
-        });
-        isValid = response.ok;
+        const loginEmail = auth.currentUser?.email || (username.includes('@') ? username : `${username}@app.local`);
+        await signInWithEmailAndPassword(auth, loginEmail, pinValue);
+        isValid = true;
       } catch (err) {
         isValid = false;
       }

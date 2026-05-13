@@ -1,4 +1,7 @@
 
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
+
 export interface CompressionSettings {
   maxWidth: number;
   quality: number;
@@ -77,24 +80,7 @@ export const uploadToFirebase = async (
     blob = await compressImage(file, settings);
   }
   
-  const formData = new FormData();
-  formData.append('image', blob, file.name);
-  formData.append('folder', folder);
-
-  try {
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    return data.url;
-  } catch (error) {
-    console.error("Local upload error:", error);
-    throw error;
-  }
+  const storageRef = ref(storage, `${folder}/${Date.now()}_${file.name}`);
+  const snapshot = await uploadBytes(storageRef, blob);
+  return await getDownloadURL(snapshot.ref);
 };

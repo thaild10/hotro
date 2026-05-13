@@ -21,7 +21,8 @@ import {
   ShoppingCart,
   Building,
   Home,
-  Monitor
+  Monitor,
+  AlertTriangle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -54,6 +55,8 @@ import {
   ImportOrder,
   SkinIssue
 } from "../types";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import Card from "./Card";
 import CardEditModal from "./Modals/CardEditModal";
 import TagManagementModal from "./Modals/TagManagementModal";
@@ -319,7 +322,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     }
   }, [initialData, saveStatus]);
 
-  // Sync with Backend
+  // Sync with Firestore
   useEffect(() => {
     // Utility to normalize data for stable comparison
     const normalize = (val: any): any => {
@@ -374,28 +377,27 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     
     const hasChanges = JSON.stringify(normalizedLocal) !== JSON.stringify(normalizedRemote);
 
-    if (hasChanges && saveStatus !== "saving") {
+    if (hasChanges && saveStatus !== "saving" && saveStatus !== "quota-exceeded") {
       const performSave = async () => {
         setSaveStatus("saving");
         try {
-          const response = await fetch("/api/data/save", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(normalizedLocal)
-          });
-          
-          if (!response.ok) throw new Error("Save status not ok");
-          
+          const docRef = doc(db, "appdata", "shared_kanban");
+          await setDoc(docRef, normalizedLocal);
           setSaveStatus("saved");
+          
           setTimeout(() => setSaveStatus("idle"), 3000);
         } catch (error: any) {
           console.error("Save error:", error);
-          setSaveStatus("error");
-          setTimeout(() => setSaveStatus("idle"), 5000);
+          if (error?.code === 'resource-exhausted' || error?.message?.includes('Quota exceeded')) {
+            setSaveStatus("quota-exceeded");
+          } else {
+            setSaveStatus("error");
+            setTimeout(() => setSaveStatus("idle"), 5000);
+          }
         }
       };
 
-      const timer = setTimeout(performSave, 5000); 
+      const timer = setTimeout(performSave, 45000); // Tăng lên 45 giây để tiết kiệm quota
       return () => clearTimeout(timer);
     }
   }, [
@@ -614,6 +616,25 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       "flex flex-col h-[100dvh] overflow-hidden bg-pastel-bg transition-all duration-300 ease-in-out relative",
       deviceView === 'mobile' ? "max-w-[430px] mx-auto border-x border-slate-200 shadow-2xl" : "w-full"
     )}>
+      {saveStatus === "quota-exceeded" && (
+        <motion.div 
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          className="bg-rose-500 text-white px-4 py-3 text-sm font-bold flex items-center justify-between shadow-lg sticky top-0 z-[2000] overflow-hidden"
+        >
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 animate-pulse" />
+            <span>Hết hạn mức Firestore (Reset vào ngày mai). Dữ liệu thay đổi sẽ không được lưu.</span>
+          </div>
+          <button 
+            onClick={() => setSaveStatus("idle")} 
+            className="p-1.5 hover:bg-white/20 rounded-lg ml-2 transition-colors"
+            title="Đóng cảnh báo"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </motion.div>
+      )}
       {/* Search Header Logic adjustment */}
       <header className="bg-white/80 backdrop-blur-md px-3 py-3 border-b border-rose-100 shrink-0 shadow-sm flex items-center justify-between gap-3 sticky top-0 z-[1500]">
         <div className="flex-1 relative max-w-md">

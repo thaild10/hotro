@@ -38,58 +38,28 @@ export default function AccountManagementModal({ accounts, onUpdateAccounts, onC
     
     if (editingId) {
       const updatedAccounts = accounts.map(a => a.id === editingId ? { ...a, username, role, password: password || a.password } : a);
-      
-      setLoading(true);
-      try {
-        await fetch("/api/users/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ users: updatedAccounts })
-        });
-        onUpdateAccounts(updatedAccounts);
-        setEditingId(null);
-        setUsername("");
-        setPassword("");
-        setRole("Nhân viên");
-      } catch (err) {
-        alert("Lỗi đồng bộ tài khoản: " + err);
-      } finally {
-        setLoading(false);
-      }
+      onUpdateAccounts(updatedAccounts);
+      setEditingId(null);
+      setUsername("");
+      setPassword("");
+      setRole("Nhân viên");
     } else {
       if (!password.trim() || password.length < 6) {
         alert("Vui lòng nhập mật khẩu hợp lệ (ít nhất 6 ký tự) để tạo tài khoản!");
         return;
       }
       
-      setLoading(true);
-      try {
-        const newAccount: UserAccount = {
-          id: `acc-${Date.now()}`,
-          username: username.trim(),
-          password: password,
-          role
-        };
-        const updatedAccounts = [newAccount, ...accounts];
-
-        const response = await fetch("/api/users/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ users: updatedAccounts })
-        });
-        
-        if (!response.ok) throw new Error("Sync failed");
-
-        onUpdateAccounts(updatedAccounts);
-        setUsername("");
-        setPassword("");
-        setRole("Nhân viên");
-      } catch (error: any) {
-        console.error("Error creating user:", error);
-        alert(`Lỗi tạo tài khoản: ${error.message}`);
-      } finally {
-        setLoading(false);
-      }
+      const newAccount: UserAccount = {
+        id: `acc-${Date.now()}`,
+        username: username.trim(),
+        password: password,
+        role
+      };
+      const updatedAccounts = [newAccount, ...accounts];
+      onUpdateAccounts(updatedAccounts);
+      setUsername("");
+      setPassword("");
+      setRole("Nhân viên");
     }
   };
 

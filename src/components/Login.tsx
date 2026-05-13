@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
+import { auth } from "../firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 interface LoginProps {
   onLoginSuccess: (username: string) => void;
@@ -35,20 +37,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await response.json();
-      if (data.success) {
-        onLoginSuccess(data.username);
-      } else {
-        setError(data.message || "Tên đăng nhập hoặc mật khẩu không đúng");
-      }
+      const userCredential = await signInWithEmailAndPassword(auth, loginEmail, password);
+      // Use the email prefix as current username
+      const displayName = userCredential.user.email?.split('@')[0] || rawInput.split('@')[0];
+      onLoginSuccess(displayName);
     } catch (err: any) {
       console.error("Login error:", err);
-      setError("Không thể kết nối đến máy chủ");
+      setError("Tên đăng nhập hoặc mật khẩu không đúng");
     } finally {
       setLoading(false);
     }

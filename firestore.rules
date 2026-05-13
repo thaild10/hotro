@@ -1,59 +1,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Global helpers
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    // Helper to extract username from email
-    function getUsernameFromEmail() {
-      return request.auth.token.email.replace('@app.local', '');
-    }
-
-    match /appdata/{username} {
-      function isOwner(username) {
-        return isSignedIn() && (
-          username == getUsernameFromEmail() || 
-          username == request.auth.uid ||
-          username == "shared_kanban" // Allow shared document for all authenticated users
-        );
-      }
-
-      function isValidAppData(data) {
-        return data.keys().hasAll(['cards', 'tagsConfig']) &&
-               data.cards is list &&
-               data.tagsConfig is map &&
-               (!data.keys().hasAny(['customers']) || data.customers is list) &&
-               (!data.keys().hasAny(['users']) || data.users is list) &&
-               (!data.keys().hasAny(['brands']) || data.brands is list) &&
-               (!data.keys().hasAny(['productCategories']) || data.productCategories is list) &&
-               (!data.keys().hasAny(['products']) || data.products is list) &&
-               (!data.keys().hasAny(['skinAudits']) || data.skinAudits is list) &&
-               (!data.keys().hasAny(['skinAuditLogs']) || data.skinAuditLogs is list) &&
-               (!data.keys().hasAny(['compressionSettings']) || data.compressionSettings is map) &&
-               (!data.keys().hasAny(['ledgerAccounts']) || data.ledgerAccounts is list) &&
-               (!data.keys().hasAny(['ledgerPurposes']) || data.ledgerPurposes is list) &&
-               (!data.keys().hasAny(['ledgerTransactions']) || data.ledgerTransactions is list) &&
-               (!data.keys().hasAny(['ledgerLogs']) || data.ledgerLogs is list) &&
-               // Limit array sizes to avoid DoW (Denial of Wallet)
-               data.cards.size() <= 1000 &&
-               data.keys().size() <= 20;
-      }
-
-      allow get: if isOwner(username);
-      allow create: if isOwner(username) && isValidAppData(request.resource.data);
-      allow update: if isOwner(username) && isValidAppData(request.resource.data);
-      allow delete: if false; // Data is precious
+    match /appdata/shared_kanban {
+      allow read, write: if isSignedIn();
     }
   }
 }

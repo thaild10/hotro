@@ -1,247 +1,33 @@
 {
   "entities": {
     "AppData": {
-      "title": "AppData",
-      "description": "User specific application data including kanban cards, tag configurations, and product management data.",
+      "title": "Application Data",
+      "description": "Shared application state including cards, customers, products etc.",
       "type": "object",
       "properties": {
-        "cards": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/KanbanCard"
-          }
-        },
-        "tagsConfig": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "array",
-            "items": {
-              "$ref": "#/entities/Tag"
-            }
-          }
-        },
-        "customers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/Customer"
-          }
-        },
-        "users": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/UserAccount"
-          }
-        },
-        "brands": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/Brand"
-          }
-        },
-        "productCategories": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/ProductCategory"
-          }
-        },
-        "products": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/Product"
-          }
-        },
-        "skinAudits": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/SkinAuditEntry"
-          }
-        },
-        "ledgerAccounts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/LedgerAccount"
-          }
-        },
-        "ledgerPurposes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/LedgerPurpose"
-          }
-        },
-        "ledgerTransactions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/LedgerTransaction"
-          }
-        },
-        "ledgerLogs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/entities/LedgerLog"
-          }
-        }
-      },
-      "required": ["cards", "tagsConfig"]
-    },
-    "Customer": {
-      "title": "Customer",
-      "description": "A customer profile.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "imageUrl": { "type": "string" }
-      }
-    },
-    "UserAccount": {
-      "title": "UserAccount",
-      "description": "A user account in the system.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "username": { "type": "string" },
-        "role": { "type": "string", "enum": ["Admin", "Nhân viên"] }
-      }
-    },
-    "Brand": {
-      "title": "Brand",
-      "description": "A product brand.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" }
-      }
-    },
-    "ProductCategory": {
-      "title": "ProductCategory",
-      "description": "A category for products.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" }
-      }
-    },
-    "Product": {
-      "title": "Product",
-      "description": "A specific product.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "brandId": { "type": "string" },
-        "categoryId": { "type": "string" },
-        "price": { "type": "number" }
-      }
-    },
-    "KanbanCard": {
-      "title": "KanbanCard",
-      "description": "A single card in the kanban system.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "tabId": { "type": "number" },
-        "name": { "type": "string" },
-        "note": { "type": "string" },
-        "doDate": { "type": "string" },
-        "startDate": { "type": "string" },
-        "doneDate": { "type": "string" },
-        "collapsed": { "type": "boolean" },
-        "doctorText": { "type": "string" },
-        "doctorDate": { "type": "string" },
-        "doctorHidden": { "type": "boolean" },
-        "notified": { "type": "boolean" },
-        "notifiedTime": { "type": "string" },
-        "tags": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "logs": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "images": {
-          "type": "array",
-          "items": { "type": "string" }
-        }
-      }
-    },
-    "Tag": {
-      "title": "Tag",
-      "description": "Tag configuration for a column.",
-      "type": "object",
-      "properties": {
-        "text": { "type": "string" },
-        "color": { "type": "string" }
-      }
-    },
-    "SkinAuditEntry": {
-      "title": "SkinAuditEntry",
-      "description": "An entry in the skin audit log.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "customerId": { "type": "string" },
-        "month": { "type": "string" },
-        "type": { "type": "string", "enum": ["Khám", "Kiểm tra"] },
-        "date": { "type": "string" },
-        "createdBy": { "type": "string" },
-        "createdAt": { "type": "string" }
-      }
-    },
-    "LedgerAccount": {
-      "title": "LedgerAccount",
-      "description": "A ledger bank account.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "accountNumber": { "type": "string" }
-      }
-    },
-    "LedgerPurpose": {
-      "title": "LedgerPurpose",
-      "description": "A transaction purpose.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "type": { "type": "string", "enum": ["Thu", "Chi"] }
-      }
-    },
-    "LedgerTransaction": {
-      "title": "LedgerTransaction",
-      "description": "A ledger income or expense record.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "accountId": { "type": "string" },
-        "purposeId": { "type": "string" },
-        "amount": { "type": "number" },
-        "date": { "type": "string" },
-        "reason": { "type": "string" },
-        "type": { "type": "string", "enum": ["Thu", "Chi"] },
-        "createdAt": { "type": "number" },
-        "customerId": { "type": "string" }
-      }
-    },
-    "LedgerLog": {
-      "title": "LedgerLog",
-      "description": "A log for ledger actions.",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "timestamp": { "type": "string" },
-        "user": { "type": "string" },
-        "action": { "type": "string" },
-        "targetType": { "type": "string" },
-        "message": { "type": "string" }
+        "cards": { "type": "array" },
+        "tagsConfig": { "type": "object" },
+        "customers": { "type": "array" },
+        "leads": { "type": "array" },
+        "brands": { "type": "array" },
+        "categories": { "type": "array" },
+        "products": { "type": "array" },
+        "ledgerTransactions": { "type": "array" },
+        "ledgerAccounts": { "type": "array" },
+        "ledgerPurposes": { "type": "array" },
+        "skinAudits": { "type": "array" },
+        "skinAuditLogs": { "type": "array" },
+        "skinIssues": { "type": "array" },
+        "importOrders": { "type": "array" },
+        "suppliers": { "type": "array" },
+        "compressionSettings": { "type": "object" }
       }
     }
   },
   "firestore": {
-    "appdata/{username}": {
+    "appdata/shared_kanban": {
       "schema": "AppData",
-      "description": "Collection storing user specific kanban data indexed by username."
+      "description": "The main shared state for the application."
     }
   }
 }
