@@ -322,82 +322,82 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     }
   }, [initialData, saveStatus]);
 
+  const performSave = async (forceData?: any) => {
+    const dataToSave = forceData || normalize(getLocalData());
+    if (!dataToSave || (saveStatus === "quota-exceeded" && !forceData)) return;
+
+    setSaveStatus("saving");
+    try {
+      const docRef = doc(db, "appdata", "shared_kanban");
+      await setDoc(docRef, dataToSave);
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch (error: any) {
+      console.error("Save error:", error);
+      if (error?.code === 'resource-exhausted' || error?.message?.includes('Quota exceeded')) {
+        setSaveStatus("quota-exceeded");
+      } else {
+        setSaveStatus("error");
+        setTimeout(() => setSaveStatus("idle"), 5000);
+      }
+    }
+  };
+
+  const getLocalData = () => ({
+    cards: cards.map(c => ({
+      ...c,
+      doneDate: c.doneDate || null,
+      doctorText: c.doctorText || "",
+      doctorDate: c.doctorDate || "",
+      doctorHidden: !!c.doctorHidden,
+      notified: !!c.notified,
+      notifiedTime: c.notifiedTime || "",
+      products: c.products || []
+    })),
+    tagsConfig,
+    customers,
+    users,
+    brands,
+    skinIssues,
+    productCategories,
+    products,
+    customerGroups,
+    skinAudits,
+    skinAuditLogs,
+    compressionSettings,
+    ledgerAccounts,
+    ledgerPurposes,
+    ledgerTransactions,
+    ledgerLogs,
+    orders,
+    suppliers,
+    importOrders
+  });
+
+  const normalize = (val: any): any => {
+    if (val === undefined || val === null) return null;
+    if (Array.isArray(val)) return val.length === 0 ? [] : val.map(normalize);
+    if (typeof val === 'object') {
+      const cleaned: any = {};
+      const keys = Object.keys(val).sort();
+      for (const key of keys) {
+        const v = normalize(val[key]);
+        cleaned[key] = v;
+      }
+      return cleaned;
+    }
+    return val;
+  };
+
   // Sync with Firestore
   useEffect(() => {
-    // Utility to normalize data for stable comparison
-    const normalize = (val: any): any => {
-      if (val === undefined || val === null) return null;
-      if (Array.isArray(val)) return val.length === 0 ? null : val.map(normalize);
-      if (typeof val === 'object') {
-        const cleaned: any = {};
-        const keys = Object.keys(val).sort();
-        if (keys.length === 0) return null;
-        for (const key of keys) {
-          const v = normalize(val[key]);
-          if (v !== null) cleaned[key] = v;
-        }
-        return Object.keys(cleaned).length === 0 ? null : cleaned;
-      }
-      return val;
-    };
-
-    const localData = {
-      cards: cards.map(c => ({
-        ...c,
-        doneDate: c.doneDate || null,
-        doctorText: c.doctorText || "",
-        doctorDate: c.doctorDate || "",
-        doctorHidden: !!c.doctorHidden,
-        notified: !!c.notified,
-        notifiedTime: c.notifiedTime || "",
-        products: c.products || []
-      })),
-      tagsConfig,
-      customers,
-      users,
-      brands,
-      skinIssues,
-      productCategories,
-      products,
-      customerGroups,
-      skinAudits,
-      skinAuditLogs,
-      compressionSettings,
-      ledgerAccounts,
-      ledgerPurposes,
-      ledgerTransactions,
-      ledgerLogs,
-      orders,
-      suppliers,
-      importOrders
-    };
-
-    const normalizedLocal = normalize(localData);
+    const normalizedLocal = normalize(getLocalData());
     const normalizedRemote = normalize(initialData);
     
     const hasChanges = JSON.stringify(normalizedLocal) !== JSON.stringify(normalizedRemote);
 
     if (hasChanges && saveStatus !== "saving" && saveStatus !== "quota-exceeded") {
-      const performSave = async () => {
-        setSaveStatus("saving");
-        try {
-          const docRef = doc(db, "appdata", "shared_kanban");
-          await setDoc(docRef, normalizedLocal);
-          setSaveStatus("saved");
-          
-          setTimeout(() => setSaveStatus("idle"), 3000);
-        } catch (error: any) {
-          console.error("Save error:", error);
-          if (error?.code === 'resource-exhausted' || error?.message?.includes('Quota exceeded')) {
-            setSaveStatus("quota-exceeded");
-          } else {
-            setSaveStatus("error");
-            setTimeout(() => setSaveStatus("idle"), 5000);
-          }
-        }
-      };
-
-      const timer = setTimeout(performSave, 45000); // Tăng lên 45 giây để tiết kiệm quota
+      const timer = setTimeout(() => performSave(normalizedLocal), 120000); // 2 minutes auto-save
       return () => clearTimeout(timer);
     }
   }, [
@@ -678,17 +678,22 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
         <div className="flex items-center gap-2 shrink-0 md:max-w-none">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar snap-x py-1 px-1 max-w-[120px] xs:max-w-[160px] sm:max-w-none">
-            <div className={cn(
-              "flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl transition-all shrink-0 shadow-sm snap-center",
-              saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-100",
-              saveStatus === "saved" && "bg-emerald-50 text-emerald-500 border border-emerald-100",
-              saveStatus === "idle" && "bg-slate-50 text-slate-400 border border-slate-100",
-              (saveStatus === "error" || saveStatus === "offline" || saveStatus === "quota-exceeded") && "bg-rose-50 text-rose-500 border border-rose-100"
-            )} title={saveStatus === "quota-exceeded" ? "Hết hạn mức Firestore (Reset vào ngày mai)" : "Trạng thái lưu"}>
+            <button 
+              onClick={() => performSave()}
+              className={cn(
+                "flex items-center justify-center min-w-[40px] w-10 h-10 rounded-xl transition-all shrink-0 shadow-sm snap-center",
+                saveStatus === "saving" && "bg-amber-50 text-amber-500 border border-amber-100",
+                saveStatus === "saved" && "bg-emerald-50 text-emerald-500 border border-emerald-100",
+                saveStatus === "idle" && "bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100",
+                (saveStatus === "error" || saveStatus === "offline" || saveStatus === "quota-exceeded") && "bg-rose-50 text-rose-500 border border-rose-100"
+              )} 
+              disabled={saveStatus === "saving"}
+              title={saveStatus === "quota-exceeded" ? "Hết hạn mức Firestore (Reset vào ngày mai)" : "Lưu dữ liệu"}
+            >
               {saveStatus === "saving" && <CloudUpload className="w-5 h-5 animate-pulse" />}
               {(saveStatus === "saved" || saveStatus === "idle") && <Cloud className="w-5 h-5" />}
               {(saveStatus === "error" || saveStatus === "offline" || saveStatus === "quota-exceeded") && <CloudOff className="w-5 h-5" />}
-            </div>
+            </button>
 
             <button 
               onClick={() => setCurrentView('orders')}
