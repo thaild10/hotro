@@ -1,0 +1,15 @@
+{
+  "name": "@beauty-crm/admin-system",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "@beauty-crm/shared": "*"
+  }
+}

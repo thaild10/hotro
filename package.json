@@ -1,12 +1,16 @@
 {
-  "name": "react-example",
+  "name": "beauty-crm-monorepo",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 3000",
-    "build": "vite build",
-    "lint": "tsc --noEmit"
+    "dev": "tsx server.ts",
+    "build": "npm run build --workspaces --if-present && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -25,7 +29,8 @@
     "react-dom": "^19.0.1",
     "react-easy-crop": "^5.5.7",
     "tailwind-merge": "^3.6.0",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "@beauty-crm/shared": "*"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
