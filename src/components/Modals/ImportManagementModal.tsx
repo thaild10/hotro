@@ -71,13 +71,13 @@ export default function ImportManagementModal({
 
   const [formState, setFormState] = useState({
     supplierId: "",
-    items: [{ productId: "", quantity: 1, importPrice: 0, subtotal: 0 }]
+    items: [{ productId: "", quantity: 1, importPrice: 0, subtotal: 0, mfgDate: "", expDate: "" }]
   });
 
   const handleAddItem = () => {
     setFormState(prev => ({
       ...prev,
-      items: [...prev.items, { productId: "", quantity: 1, importPrice: 0, subtotal: 0 }]
+      items: [...prev.items, { productId: "", quantity: 1, importPrice: 0, subtotal: 0, mfgDate: "", expDate: "" }]
     }));
   };
 
@@ -90,13 +90,15 @@ export default function ImportManagementModal({
       
       if (updates.productId !== undefined && prod) {
         item.importPrice = prod.details?.importPrice || 0;
+        item.mfgDate = prod.details?.mfgDate || "";
+        item.expDate = prod.details?.expDate || "";
       }
       
       item.subtotal = item.importPrice * item.quantity;
       newItems[index] = item;
       
       if (index === newItems.length - 1 && item.productId) {
-        newItems.push({ productId: "", quantity: 1, importPrice: 0, subtotal: 0 });
+        newItems.push({ productId: "", quantity: 1, importPrice: 0, subtotal: 0, mfgDate: "", expDate: "" });
       }
       
       return { ...prev, items: newItems };
@@ -165,7 +167,7 @@ export default function ImportManagementModal({
         setEditingId(null);
         setFormState({
           supplierId: "",
-          items: [{ productId: "", quantity: 1, importPrice: 0, subtotal: 0 }]
+          items: [{ productId: "", quantity: 1, importPrice: 0, subtotal: 0, mfgDate: "", expDate: "" }]
         });
       }
     });
@@ -174,7 +176,7 @@ export default function ImportManagementModal({
   const handleEdit = (order: ImportOrder) => {
     setFormState({
       supplierId: order.supplierId,
-      items: [...order.items, { productId: "", quantity: 1, importPrice: 0, subtotal: 0 }]
+      items: [...order.items.map(i => ({ mfgDate: "", expDate: "", ...i })), { productId: "", quantity: 1, importPrice: 0, subtotal: 0, mfgDate: "", expDate: "" }]
     });
     setEditingId(order.id);
     setShowForm(true);
@@ -229,112 +231,188 @@ export default function ImportManagementModal({
         <AnimatePresence>
           {showForm && (
             <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="bg-amber-50/50 p-6 rounded-[32px] border border-amber-100 shadow-inner overflow-hidden"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              className="absolute inset-x-0 inset-y-0 bg-white z-[2100] flex flex-col"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xs font-black text-amber-400 uppercase tracking-widest">
-                  {editingId ? "Cập nhật phiếu nhập" : "Tạo phiếu nhập mới"}
-                </h3>
-                <button onClick={() => { setShowForm(false); setEditingId(null); }} className="p-2 text-amber-300 hover:text-amber-500 transition-colors">
-                  <X className="w-5 h-5" />
+              <div className="p-6 border-b border-pastel-border bg-amber-50/50 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-100">
+                    {editingId ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                  </div>
+                  <h3 className="text-lg font-black text-slate-800 uppercase tracking-wider">
+                    {editingId ? "Cập nhật phiếu nhập" : "Tạo phiếu nhập mới"}
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => { setShowForm(false); setEditingId(null); }}
+                  className="w-10 h-10 rounded-xl bg-white border border-pastel-border hover:bg-rose-50 hover:text-rose-500 transition-all flex items-center justify-center"
+                >
+                  <X className="w-6 h-6" />
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Supplier Selection */}
-                <div className="space-y-4">
-                  <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1 block">Nhà cung cấp</label>
-                  <select 
-                    value={formState.supplierId}
-                    onChange={(e) => setFormState(prev => ({ ...prev, supplierId: e.target.value }))}
-                    className="w-full bg-white border border-amber-100 rounded-2xl p-4 text-sm font-bold outline-none focus:ring-4 focus:ring-amber-500/5 transition-all shadow-sm"
-                  >
-                    <option value="">-- Chọn nhà cung cấp --</option>
-                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+              <div className="flex-1 overflow-y-auto p-8 no-scrollbar bg-pastel-bg/10">
+                <div className="max-w-6xl mx-auto space-y-12 pb-32">
+                  {/* Supplier Section */}
+                  <div className="p-8 bg-white border border-amber-100 rounded-[40px] shadow-sm space-y-6">
+                    <h4 className="text-[11px] font-black text-amber-500 uppercase tracking-[0.2em] px-1 flex items-center gap-2">
+                       <Building className="w-4 h-4" /> Thông tin nhà cung cấp
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-pastel-subtext uppercase ml-1">Nhà cung cấp</label>
+                        <select 
+                          value={formState.supplierId}
+                          onChange={(e) => setFormState(prev => ({ ...prev, supplierId: e.target.value }))}
+                          className="w-full bg-slate-50 border border-pastel-border rounded-2xl p-4 text-sm font-bold outline-none focus:ring-4 focus:ring-amber-500/5 transition-all"
+                        >
+                          <option value="">-- Chọn nhà cung cấp --</option>
+                          {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </div>
 
-                  <div className="p-6 bg-white border border-amber-100 rounded-[24px] shadow-sm space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-pastel-subtext">
-                      <span>Loại SP:</span>
-                      <span className="font-black text-slate-700">{formState.items.filter(i => i.productId).length}</span>
-                    </div>
-                    <div className="pt-3 border-t border-amber-100 border-dashed flex items-center justify-between">
-                      <span className="text-sm font-black text-slate-800 uppercase">Tổng tiền:</span>
-                      <span className="text-lg font-black text-amber-600">{totalAmount.toLocaleString()}đ</span>
+                      {formState.supplierId && (
+                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100/50 space-y-2">
+                          <div className="flex justify-between text-xs">
+                             <span className="font-bold text-pastel-subtext">Điện thoại:</span>
+                             <span className="font-black text-slate-700">{suppliers.find(s => s.id === formState.supplierId)?.phone || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                             <span className="font-bold text-pastel-subtext">Tài khoản:</span>
+                             <span className="font-black text-slate-700">{suppliers.find(s => s.id === formState.supplierId)?.accountNumber || 'N/A'}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
+                  {/* Product List Section */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between px-2">
+                      <h4 className="text-[11px] font-black text-pastel-subtext uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Package className="w-4 h-4" /> Danh sách sản phẩm nhập
+                      </h4>
+                    </div>
+
+                    <div className="space-y-4">
+                      {formState.items.map((item, index) => (
+                        <div key={index} className="bg-white p-6 rounded-[32px] border border-pastel-border hover:border-amber-200 transition-all shadow-sm relative group overflow-hidden">
+                          {/* STT Badge */}
+                          <div className="absolute top-0 left-0 w-10 h-10 bg-amber-100 text-amber-600 flex items-center justify-center font-black text-xs rounded-br-2xl">
+                             {index + 1}
+                          </div>
+
+                          <div className="grid grid-cols-12 gap-6 items-end pl-6">
+                            <div className="col-span-12 lg:col-span-4">
+                               <label className="text-[9px] font-black text-pastel-subtext uppercase mb-2 ml-1 block">Sản phẩm</label>
+                               <select 
+                                value={item.productId}
+                                onChange={(e) => handleItemChange(index, { productId: e.target.value })}
+                                className="w-full bg-slate-50 border border-pastel-border rounded-xl p-3 text-xs font-bold outline-none focus:border-amber-400"
+                              >
+                                <option value="">-- Chọn sản phẩm --</option>
+                                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                              </select>
+                            </div>
+
+                            <div className="col-span-6 lg:col-span-2">
+                               <label className="text-[9px] font-black text-pastel-subtext uppercase mb-2 ml-1 block">Ngày SX (MFG)</label>
+                               <input 
+                                  type="date"
+                                  value={item.mfgDate}
+                                  onChange={(e) => handleItemChange(index, { mfgDate: e.target.value })}
+                                  className="w-full bg-slate-50 border border-pastel-border rounded-xl p-3 text-[10px] font-bold outline-none focus:border-amber-400"
+                               />
+                            </div>
+
+                            <div className="col-span-6 lg:col-span-2">
+                               <label className="text-[9px] font-black text-pastel-subtext uppercase mb-2 ml-1 block">Ngày hết hạn (EXP)</label>
+                               <input 
+                                  type="date"
+                                  value={item.expDate}
+                                  onChange={(e) => handleItemChange(index, { expDate: e.target.value })}
+                                  className="w-full bg-slate-50 border border-pastel-border rounded-xl p-3 text-[10px] font-bold outline-none focus:border-amber-400"
+                               />
+                            </div>
+
+                            <div className="col-span-6 lg:col-span-2">
+                               <label className="text-[9px] font-black text-pastel-subtext uppercase mb-2 ml-1 block">Giá nhập</label>
+                               <input 
+                                type="text"
+                                value={item.importPrice.toLocaleString()}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                                  handleItemChange(index, { importPrice: val });
+                                }}
+                                className="w-full bg-slate-50 border border-pastel-border rounded-xl p-3 text-xs font-black outline-none focus:border-amber-400"
+                              />
+                            </div>
+
+                            <div className="col-span-6 lg:col-span-2 relative">
+                               <label className="text-[9px] font-black text-pastel-subtext uppercase mb-2 ml-1 block">Số lượng</label>
+                               <input 
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => handleItemChange(index, { quantity: parseInt(e.target.value) || 0 })}
+                                className="w-full bg-slate-50 border border-pastel-border rounded-xl p-3 text-xs font-bold text-center outline-none focus:border-amber-400"
+                                min="1"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-between bg-amber-50/50 p-4 rounded-2xl ml-6">
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-pastel-subtext uppercase">Thành tiền:</span>
+                                <span className="text-sm font-black text-amber-600">{item.subtotal.toLocaleString()} đ</span>
+                             </div>
+                             {formState.items.length > 1 && (
+                                <button 
+                                  onClick={() => handleRemoveItem(index)}
+                                  className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                             )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={handleAddItem}
+                      className="w-full py-4 border-2 border-dashed border-pastel-border rounded-[32px] text-pastel-subtext font-bold text-xs uppercase tracking-widest hover:border-amber-300 hover:text-amber-500 transition-all flex items-center justify-center gap-2 bg-white"
+                    >
+                      <PlusCircle className="w-5 h-5" /> Thêm sản phẩm nhập
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sticky Footer for Form */}
+              <div className="p-8 bg-white border-t border-pastel-border flex flex-col md:flex-row items-center justify-between gap-6 shrink-0">
+                <div className="flex items-center gap-6">
+                  <div className="bg-amber-50 px-6 py-3 rounded-2xl border border-amber-100">
+                     <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">TỔNG TIỀN PHIẾU NHẬP</span>
+                     <span className="text-2xl font-black text-slate-800">{totalAmount.toLocaleString()} đ</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                   <button 
+                    onClick={() => { setShowForm(false); setEditingId(null); }}
+                    className="flex-1 md:flex-none px-8 py-4 rounded-2xl font-bold text-sm text-pastel-subtext hover:bg-slate-50 transition-all"
+                  >
+                    Hủy bỏ
+                  </button>
                   <button 
                     onClick={handleSave}
                     disabled={!formState.supplierId || formState.items.filter(i => i.productId).length === 0}
-                    className="w-full bg-amber-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-amber-100 flex items-center justify-center gap-2 active:scale-95 transition-all border-b-4 border-amber-800 disabled:opacity-50 disabled:grayscale"
+                    className="flex-1 md:flex-none px-12 py-4 bg-amber-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-amber-100 active:scale-95 transition-all border-b-4 border-amber-800 disabled:opacity-50"
                   >
-                    <CheckCircle2 className="w-5 h-5" /> HOÀN TẤT
-                  </button>
-                </div>
-
-                {/* Items List */}
-                <div className="lg:col-span-2 space-y-3">
-                  <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1 block">Danh sách sản phẩm</label>
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
-                    {formState.items.map((item, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-2 p-3 bg-white border border-amber-100 rounded-2xl relative group shadow-sm">
-                        <div className="col-span-12 md:col-span-6">
-                          <label className="text-[9px] font-black text-amber-300 uppercase tracking-widest mb-1.5 ml-1 block">Sản phẩm</label>
-                          <select 
-                            value={item.productId}
-                            onChange={(e) => handleItemChange(index, { productId: e.target.value })}
-                            className="w-full bg-amber-50/30 border border-amber-50 rounded-xl p-2.5 text-[11px] font-bold outline-none focus:border-amber-400"
-                          >
-                            <option value="">-- Chọn sản phẩm --</option>
-                            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="col-span-4 md:col-span-2">
-                          <label className="text-[9px] font-black text-amber-300 uppercase tracking-widest mb-1.5 ml-1 block">SL</label>
-                          <input 
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(index, { quantity: parseInt(e.target.value) || 0 })}
-                            className="w-full bg-amber-50/30 border border-amber-50 rounded-xl p-2.5 text-[11px] font-bold text-center outline-none"
-                            min="1"
-                          />
-                        </div>
-                        <div className="col-span-4 md:col-span-2">
-                          <label className="text-[9px] font-black text-amber-300 uppercase tracking-widest mb-1.5 ml-1 block">Giá nhập</label>
-                          <input 
-                            type="text"
-                            value={item.importPrice.toLocaleString()}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
-                              handleItemChange(index, { importPrice: val });
-                            }}
-                            className="w-full bg-amber-50/30 border border-amber-50 rounded-xl p-2.5 text-[11px] font-bold outline-none"
-                          />
-                        </div>
-                        <div className="col-span-4 md:col-span-2">
-                          <label className="text-[9px] font-black text-amber-300 uppercase tracking-widest mb-1.5 ml-1 block">Tổng</label>
-                          <div className="w-full bg-white border border-amber-50 rounded-xl p-2.5 text-[11px] font-black text-amber-600 truncate">
-                            {item.subtotal.toLocaleString()}
-                          </div>
-                        </div>
-                        <button 
-                          onClick={() => handleRemoveItem(index)}
-                          className="absolute -right-1 top-1/2 -translate-y-1/2 p-1.5 bg-rose-50 text-rose-500 rounded-lg shadow-sm border border-rose-100 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button 
-                    onClick={handleAddItem}
-                    className="w-full py-3 border-2 border-dashed border-amber-200 rounded-2xl text-amber-400 font-bold text-[10px] uppercase tracking-widest hover:border-amber-400 hover:text-amber-500 transition-all flex items-center justify-center gap-2"
-                  >
-                    <PlusCircle className="w-4 h-4" /> Thêm sản phẩm
+                    {editingId ? "CẬP NHẬT PHIẾU" : "TẠO PHIẾU NHẬP"}
                   </button>
                 </div>
               </div>

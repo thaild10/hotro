@@ -35,9 +35,10 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateC
   const showTimeInput = React.useRef(false);
   
   const toggleTag = (tagText: string) => {
+    const currentTags = card.tags || [];
     // Single select for Tab 5 (Spa)
     if (card.tabId === 5) {
-      if (card.tags.includes(tagText)) {
+      if (currentTags.includes(tagText)) {
         onUpdateCard({ tags: [] });
       } else {
         // Special logic for "Xếp lịch"
@@ -52,10 +53,10 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateC
     }
 
     // Default multi-select
-    if (card.tags.includes(tagText)) {
-      onUpdateCard({ tags: card.tags.filter(t => t !== tagText) });
+    if (currentTags.includes(tagText)) {
+      onUpdateCard({ tags: currentTags.filter(t => t !== tagText) });
     } else {
-      onUpdateCard({ tags: [...card.tags, tagText] });
+      onUpdateCard({ tags: [...currentTags, tagText] });
     }
   };
 
@@ -89,12 +90,13 @@ export default function TagSelectionModal({ card, tagsConfig, onClose, onUpdateC
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-6">
-          {availTags.length > 0 ? availTags.map(tag => {
+          {availTags.length > 0 ? availTags.map((tag, idx) => {
+            if (!tag) return null;
             const colors = getTagColors(tag.text);
-            const isActive = card.tags.includes(tag.text);
+            const isActive = (card.tags || []).includes(tag.text);
             return (
               <button 
-                key={tag.text}
+                key={`${tag.text}-${idx}-${card.id}`}
                 onClick={() => toggleTag(tag.text)}
                 className={cn(
                   "py-2.5 px-3 rounded-2xl text-[11px] font-black border transition-all active:scale-95",

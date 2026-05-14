@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { X, Package, Box, Tags, Plus, Pencil, Trash2, ArrowDownAZ, ArrowUpZA, Save, Image as ImageIcon, CloudUpload } from "lucide-react";
 import { motion } from "motion/react";
-import { Brand, ProductCategory, Product, ImageCompressionSettings, SkinIssue } from "../../types";
+import { Brand, ProductCategory, Product, ImageCompressionSettings, SkinIssue, Ingredient } from "../../types";
 import { cn } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { uploadToFirebase } from "../../lib/imageUtils";
@@ -12,10 +12,12 @@ interface ProductManagementModalProps {
   brands: Brand[];
   categories: ProductCategory[];
   skinIssues: SkinIssue[];
+  mainIngredients: Ingredient[];
   products: Product[];
   onUpdateBrands: (brands: Brand[]) => void;
   onUpdateCategories: (categories: ProductCategory[]) => void;
   onUpdateSkinIssues: (skinIssues: SkinIssue[]) => void;
+  onUpdateIngredients: (ingredients: Ingredient[]) => void;
   onUpdateProducts: (products: Product[]) => void;
   onClose: () => void;
   compressionSettings: ImageCompressionSettings;
@@ -23,13 +25,13 @@ interface ProductManagementModalProps {
 }
 
 export default function ProductManagementModal({
-  brands, categories, skinIssues, products,
-  onUpdateBrands, onUpdateCategories, onUpdateSkinIssues, onUpdateProducts,
+  brands, categories, skinIssues, mainIngredients, products,
+  onUpdateBrands, onUpdateCategories, onUpdateSkinIssues, onUpdateIngredients, onUpdateProducts,
   onClose,
   compressionSettings,
   deviceView = 'desktop'
 }: ProductManagementModalProps) {
-  const [activeTab, setActiveTab] = useState<0 | 1 | 2 | 3>(0);
+  const [activeTab, setActiveTab] = useState<0 | 1 | 2 | 3 | 4>(0);
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
 
   return (
@@ -102,10 +104,19 @@ export default function ProductManagementModal({
           >
             4. Vấn đề da
           </button>
+          <button
+            onClick={() => setActiveTab(4)}
+            className={cn(
+              "text-[10px] font-black px-4 py-2 rounded-xl transition-all whitespace-nowrap uppercase tracking-wider shadow-sm",
+              activeTab === 4 ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 border border-pastel-border'
+            )}
+          >
+            5. Thành phần chính
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col min-h-0 bg-slate-50/50 no-scrollbar">
+      <div className="flex-1 overflow-y-auto p-6 flex flex-col min-h-0 bg-slate-50/50">
         {activeTab === 0 && (
           <BrandTab brands={brands} onUpdateBrands={onUpdateBrands} setConfirmConfig={setConfirmConfig} />
         )}
@@ -117,6 +128,8 @@ export default function ProductManagementModal({
             products={products} 
             brands={brands} 
             categories={categories} 
+            skinIssues={skinIssues}
+            mainIngredients={mainIngredients}
             onUpdateProducts={onUpdateProducts} 
             setConfirmConfig={setConfirmConfig} 
             compressionSettings={compressionSettings}
@@ -124,6 +137,13 @@ export default function ProductManagementModal({
         )}
         {activeTab === 3 && (
           <SkinIssueTab skinIssues={skinIssues} onUpdateSkinIssues={onUpdateSkinIssues} setConfirmConfig={setConfirmConfig} />
+        )}
+        {activeTab === 4 && (
+          <IngredientTab 
+            ingredients={mainIngredients} 
+            onUpdateIngredients={onUpdateIngredients} 
+            setConfirmConfig={setConfirmConfig} 
+          />
         )}
       </div>
 
@@ -156,7 +176,7 @@ function BrandTab({
 
   const handleCreate = () => {
     if (!newName.trim()) return;
-    const newBrand: Brand = { id: `brand-${Date.now()}`, name: newName.trim() };
+    const newBrand: Brand = { id: `brand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: newName.trim() };
     onUpdateBrands([...brands, newBrand]);
     setNewName("");
   };
@@ -196,7 +216,7 @@ function BrandTab({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Top bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border shadow-sm">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <input 
             type="text"
@@ -212,14 +232,12 @@ function BrandTab({
           >
             Tạo
           </button>
-        </div>
-        <div className="flex items-center gap-2">
           <button 
             onClick={() => setSortAsc(!sortAsc)}
-            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none w-full sm:w-auto"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none"
           >
             {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
-            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
+            <span className="hidden sm:inline">{sortAsc ? "Từ A - Z" : "Từ Z - A"}</span>
           </button>
         </div>
       </div>
@@ -227,14 +245,14 @@ function BrandTab({
       {/* List */}
       <div className="flex-1 border border-pastel-border bg-white rounded-3xl overflow-hidden flex flex-col">
         <div className="flex px-4 py-3 bg-pastel-bg border-b border-pastel-border text-xs font-black text-pastel-subtext uppercase">
-          <div className="w-12 text-center">STT</div>
+          <div className="w-16 text-center">Số thứ tự</div>
           <div className="flex-1">Tên hãng</div>
           <div className="w-24 text-right">Thao tác</div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
           {paginatedBrands.map((brand, idx) => (
             <div key={brand.id} className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors">
-              <div className="w-12 text-center text-sm font-bold text-pastel-subtext">
+              <div className="w-16 text-center text-sm font-bold text-pastel-subtext">
                 {(currentPage - 1) * pageSize + idx + 1}
               </div>
               <div className="flex-1 font-bold text-sm text-slate-700">
@@ -327,7 +345,7 @@ function CategoryTab({
 
   const handleCreate = () => {
     if (!newName.trim()) return;
-    const newCategory: ProductCategory = { id: `cat-${Date.now()}`, name: newName.trim() };
+    const newCategory: ProductCategory = { id: `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: newName.trim() };
     onUpdateCategories([...categories, newCategory]);
     setNewName("");
   };
@@ -367,7 +385,7 @@ function CategoryTab({
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Top bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border shadow-sm">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <input 
             type="text"
@@ -383,14 +401,12 @@ function CategoryTab({
           >
             Tạo
           </button>
-        </div>
-        <div className="flex items-center gap-2">
           <button 
             onClick={() => setSortAsc(!sortAsc)}
-            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none w-full sm:w-auto"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none"
           >
             {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
-            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
+            <span className="hidden sm:inline">{sortAsc ? "Từ A - Z" : "Từ Z - A"}</span>
           </button>
         </div>
       </div>
@@ -398,14 +414,14 @@ function CategoryTab({
       {/* List */}
       <div className="flex-1 border border-pastel-border bg-white rounded-3xl overflow-hidden flex flex-col">
         <div className="flex px-4 py-3 bg-pastel-bg border-b border-pastel-border text-xs font-black text-pastel-subtext uppercase">
-          <div className="w-12 text-center">STT</div>
+          <div className="w-16 text-center">Số thứ tự</div>
           <div className="flex-1">Tên loại</div>
           <div className="w-24 text-right">Thao tác</div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
           {paginatedCategories.map((category, idx) => (
             <div key={category.id} className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors">
-              <div className="w-12 text-center text-sm font-bold text-pastel-subtext">
+              <div className="w-16 text-center text-sm font-bold text-pastel-subtext">
                 {(currentPage - 1) * pageSize + idx + 1}
               </div>
               <div className="flex-1 font-bold text-sm text-slate-700">
@@ -486,6 +502,8 @@ function ProductTab({
   products, 
   brands,
   categories,
+  skinIssues,
+  mainIngredients,
   onUpdateProducts, 
   setConfirmConfig,
   compressionSettings
@@ -493,16 +511,22 @@ function ProductTab({
   products: Product[],
   brands: Brand[],
   categories: ProductCategory[],
+  skinIssues: SkinIssue[],
+  mainIngredients: Ingredient[],
   onUpdateProducts: (p: Product[]) => void, 
   setConfirmConfig: any,
   compressionSettings: ImageCompressionSettings
 }) {
-  const [sortAsc, setSortAsc] = useState(true);
+  const [sortType, setSortType] = useState<'name-asc' | 'name-desc' | 'brand-asc' | 'brand-desc'>('name-asc');
   const [newName, setNewName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [filterBrand, setFilterBrand] = useState("");
+  const [filterBrandSearch, setFilterBrandSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterSearch, setFilterSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cropperData, setCropperData] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -563,7 +587,9 @@ function ProductTab({
     strength: "",
     daysToUse: "",
     mfgDate: "",
-    expDate: ""
+    expDate: "",
+    skinIssues: [] as string[],
+    mainIngredients: [] as string[]
   });
 
   const [viewDetailsId, setViewDetailsId] = useState<string | null>(null);
@@ -571,6 +597,8 @@ function ProductTab({
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState("");
+  const [editingBrandId, setEditingBrandId] = useState("");
 
   const handleCreate = () => {
     if (!newName.trim() || !selectedBrand || !selectedCategory) {
@@ -579,7 +607,7 @@ function ProductTab({
       return;
     }
     const newProduct: Product = { 
-      id: `prod-${Date.now()}`, 
+      id: `prod-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
       name: newName.trim(),
       brandId: selectedBrand,
       categoryId: selectedCategory,
@@ -594,7 +622,9 @@ function ProductTab({
         strength: details.strength || undefined,
         daysToUse: details.daysToUse ? Number(details.daysToUse) : undefined,
         mfgDate: details.mfgDate || undefined,
-        expDate: details.expDate || undefined
+        expDate: details.expDate || undefined,
+        skinIssues: details.skinIssues.length > 0 ? details.skinIssues : undefined,
+        mainIngredients: details.mainIngredients.length > 0 ? details.mainIngredients : undefined
       }
     };
     onUpdateProducts([...products, newProduct]);
@@ -610,14 +640,16 @@ function ProductTab({
       strength: "",
       daysToUse: "",
       mfgDate: "",
-      expDate: ""
+      expDate: "",
+      skinIssues: [],
+      mainIngredients: []
     });
     setError(null);
   };
 
   const handleSaveEdit = (id: string) => {
     if (!editName.trim()) return;
-    onUpdateProducts(products.map(p => p.id === id ? { ...p, name: editName.trim() } : p));
+    onUpdateProducts(products.map(p => p.id === id ? { ...p, name: editName.trim(), categoryId: editingCategoryId, brandId: editingBrandId } : p));
     setEditingId(null);
   };
 
@@ -631,11 +663,32 @@ function ProductTab({
     });
   };
 
-  const sortedProducts = useMemo(() => {
-    return [...products].sort((a, b) => {
-      return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      if (p.id === 'prod-1778507933217') return false;
+      const brand = brands.find(br => br.id === p.brandId);
+      const matchBrandSearch = !filterBrandSearch || brand?.name.toLowerCase().includes(filterBrandSearch.toLowerCase());
+      const matchBrand = !filterBrand || p.brandId === filterBrand;
+      const matchCategory = !filterCategory || p.categoryId === filterCategory;
+      const matchSearch = !filterSearch || p.name.toLowerCase().includes(filterSearch.toLowerCase());
+      return matchBrand && matchCategory && matchSearch && matchBrandSearch;
     });
-  }, [products, sortAsc]);
+  }, [products, filterBrand, filterCategory, filterSearch, filterBrandSearch, brands]);
+
+  const sortedProducts = useMemo(() => {
+    return [...filteredProducts].sort((a, b) => {
+      if (sortType === 'name-asc') return a.name.localeCompare(b.name);
+      if (sortType === 'name-desc') return b.name.localeCompare(a.name);
+      
+      const brandA = brands.find(br => br.id === a.brandId)?.name || "";
+      const brandB = brands.find(br => br.id === b.brandId)?.name || "";
+      
+      if (sortType === 'brand-asc') return brandA.localeCompare(brandB);
+      if (sortType === 'brand-desc') return brandB.localeCompare(brandA);
+      
+      return 0;
+    });
+  }, [filteredProducts, sortType, brands]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -645,10 +698,61 @@ function ProductTab({
     return sortedProducts.slice(start, start + pageSize);
   }, [sortedProducts, currentPage, pageSize]);
 
-  const totalPages = Math.ceil(products.length / pageSize);
+  const totalPages = Math.ceil(filteredProducts.length / pageSize);
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const [y, m, d] = dateStr.split("-");
+    if (!y || !m || !d) return dateStr;
+    return `${d.padStart(2, '0')}.${m.padStart(2, '0')}.${y.slice(-2)}`;
+  };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col min-h-full space-y-4 font-sans">
+      {/* Search & Filter bar inner content */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border shadow-sm">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="relative">
+            <input 
+              type="text"
+              value={filterSearch}
+              onChange={e => { setFilterSearch(e.target.value); setCurrentPage(1); }}
+              placeholder="Tìm theo tên sản phẩm..."
+              className="w-full bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors"
+            />
+          </div>
+          <div className="relative">
+            <input 
+              type="text"
+              value={filterBrandSearch}
+              onChange={e => { setFilterBrandSearch(e.target.value); setCurrentPage(1); }}
+              placeholder="Nhập tên hãng..."
+              className="w-full bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={e => { setFilterCategory(e.target.value); setCurrentPage(1); }}
+            className="w-full bg-pastel-bg rounded-xl px-3 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors truncate"
+          >
+            <option value="">Lọc theo loại...</option>
+            {categories.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <select
+            value={sortType}
+            onChange={e => setSortType(e.target.value as any)}
+            className="w-full bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors"
+          >
+            <option value="name-asc">A - Z</option>
+            <option value="name-desc">Z - A</option>
+            <option value="brand-asc">Hãng A - Z</option>
+            <option value="brand-desc">Hãng Z - A</option>
+          </select>
+        </div>
+      </div>
+
       {/* Top bar */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border relative">
         {error && (
@@ -719,22 +823,25 @@ function ProductTab({
               />
             </div>
           </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <button 
+            onClick={() => setShowDetailsInputs(!showDetailsInputs)}
+            className="px-4 py-3 bg-white border border-amber-200 text-amber-500 rounded-xl font-bold text-xs flex items-center gap-2 active:scale-95 transition-all shadow-sm"
+          >
+            <Plus className={`w-4 h-4 transition-transform ${showDetailsInputs ? 'rotate-45' : ''}`} />
+            Thông tin chi tiết
+          </button>
+          
           <button 
             onClick={handleCreate}
-            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform whitespace-nowrap"
+            className="flex-1 sm:flex-none px-8 py-3 bg-amber-500 text-white rounded-xl font-black text-sm shadow-xl shadow-amber-200 active:scale-95 transition-all whitespace-nowrap"
           >
             Tạo
           </button>
         </div>
-
-        <div className="flex flex-col gap-2">
-          <button 
-            onClick={() => setShowDetailsInputs(!showDetailsInputs)}
-            className="text-xs font-bold text-amber-500 flex items-center gap-1 hover:underline self-start"
-          >
-            <Plus className={`w-3 h-3 transition-transform ${showDetailsInputs ? 'rotate-45' : ''}`} />
-            Thông tin chi tiết
-          </button>
+      </div>
 
           {showDetailsInputs && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-pastel-bg/30 p-3 rounded-2xl border border-pastel-border/50 animate-in fade-in slide-in-from-top-1">
@@ -819,7 +926,7 @@ function ProductTab({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Ngày SX (MFG)</label>
+                <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">SẢN XUẤT(MFG)</label>
                 <input 
                   type="date" 
                   value={details.mfgDate}
@@ -828,7 +935,7 @@ function ProductTab({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Hạn SD (EXP)</label>
+                <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">HẠN SỬ DỤNG (EXP)</label>
                 <input 
                   type="date" 
                   value={details.expDate}
@@ -836,9 +943,58 @@ function ProductTab({
                   className="w-full bg-white rounded-lg px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-amber-300" 
                 />
               </div>
+              
+              <div className="space-y-1 col-span-2">
+                <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Vấn đề da</label>
+                <div className="flex flex-wrap gap-1 bg-white p-2 rounded-lg border border-transparent focus-within:border-amber-300 min-h-[40px]">
+                  {skinIssues.map(issue => (
+                    <button
+                      key={issue.id}
+                      onClick={() => {
+                        setDetails(prev => ({
+                          ...prev,
+                          skinIssues: prev.skinIssues.includes(issue.id) 
+                            ? prev.skinIssues.filter(id => id !== issue.id)
+                            : [...prev.skinIssues, issue.id]
+                        }));
+                      }}
+                      className={cn(
+                        "text-[9px] px-2 py-0.5 rounded-full font-bold transition-colors",
+                        details.skinIssues.includes(issue.id) ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500"
+                      )}
+                    >
+                      {issue.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1 col-span-2">
+                <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Thành phần chính</label>
+                <div className="flex flex-wrap gap-1 bg-white p-2 rounded-lg border border-transparent focus-within:border-amber-300 min-h-[40px]">
+                  {mainIngredients.map(ing => (
+                    <button
+                      key={ing.id}
+                      onClick={() => {
+                        setDetails(prev => ({
+                          ...prev,
+                          mainIngredients: prev.mainIngredients.includes(ing.id) 
+                            ? prev.mainIngredients.filter(id => id !== ing.id)
+                            : [...prev.mainIngredients, ing.id]
+                        }));
+                      }}
+                      className={cn(
+                        "text-[9px] px-2 py-0.5 rounded-full font-bold transition-colors",
+                        details.mainIngredients.includes(ing.id) ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500"
+                      )}
+                    >
+                      {ing.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
-        </div>
         
         {cropperData && (
           <ImageCropperModal 
@@ -848,41 +1004,44 @@ function ProductTab({
           />
         )}
 
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setSortAsc(!sortAsc)}
-            className="flex items-center justify-center sm:justify-start gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none text-sm w-full lg:w-auto shrink-0"
-          >
-            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
-            {sortAsc ? "Từ A - Z" : "Từ Z - A"}
-          </button>
-        </div>
-      </div>
-
       {/* List */}
-      <div className="flex-1 border border-pastel-border bg-white rounded-3xl overflow-hidden flex flex-col">
-        <div className="flex px-4 py-3 bg-pastel-bg border-b border-pastel-border text-xs font-black text-pastel-subtext uppercase">
-          <div className="w-10 text-center">STT</div>
+      <div className="flex-1 border border-pastel-border bg-white rounded-3xl overflow-hidden flex flex-col shadow-sm">
+        <div className="flex px-4 py-3 bg-pastel-bg border-b border-pastel-border text-xs font-black text-pastel-subtext uppercase tracking-wider">
+          <div className="w-16 text-center">Số thứ tự</div>
+          <div className="w-32">Hãng</div>
           <div className="flex-1">Tên sản phẩm</div>
-          <div className="w-24">Hãng</div>
-          <div className="w-24">Loại</div>
-          <div className="w-20 text-center">Nội dung</div>
-          <div className="w-24 text-right">Thao tác</div>
+          <div className="w-32">Loại</div>
+          <div className="w-24 text-center">Thông tin</div>
+          <div className="w-24 text-right pr-4">Thao tác</div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
           {paginatedProducts.map((product, idx) => {
             const brand = brands.find(b => b.id === product.brandId);
             const category = categories.find(c => c.id === product.categoryId);
-            const isDetailed = product.details && Object.values(product.details).every(v => v !== undefined && v !== "");
-            const hasDetails = product.details && Object.values(product.details).some(v => v !== undefined && v !== "");
+            const isDetailed = product.details && (product.details.importPrice || product.details.sellingPrice || product.details.usage || product.details.description);
             
             return (
               <div key={product.id} className="flex flex-col border-b border-pastel-border/30 last:border-0">
-                <div className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors">
-                  <div className="w-10 text-center text-sm font-bold text-pastel-subtext">
+                <div className="flex items-center px-2 py-3 hover:bg-pastel-bg/50 rounded-2xl transition-colors">
+                  <div className="w-16 text-center text-sm font-bold text-pastel-subtext font-mono">
                     {(currentPage - 1) * pageSize + idx + 1}
                   </div>
-                  <div className="flex-1 font-bold text-sm text-slate-700 pr-2">
+                  <div className="w-32 text-[11px] font-black text-amber-600 truncate pr-4 uppercase italic">
+                    {editingId === product.id ? (
+                      <select
+                        value={editingBrandId}
+                        onChange={e => setEditingBrandId(e.target.value)}
+                        className="w-full bg-white border-b-2 border-amber-500 px-1 py-1 outline-none text-[10px] font-bold"
+                      >
+                        {brands.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      brand?.name || '-'
+                    )}
+                  </div>
+                  <div className="flex-1 flex items-center gap-2 pr-4">
                     {editingId === product.id ? (
                       <input 
                         type="text"
@@ -893,24 +1052,35 @@ function ProductTab({
                           if (e.key === 'Escape') setEditingId(null);
                         }}
                         autoFocus
-                        className="w-full bg-white border-b-2 border-amber-500 px-2 py-1 outline-none"
+                        className="flex-1 bg-white border-b-2 border-amber-500 px-2 py-1 outline-none font-bold text-sm"
                       />
                     ) : (
-                      <span className="">{product.name}</span>
+                      <span className="font-bold text-sm text-slate-700">{product.name}</span>
                     )}
                   </div>
-                  <div className="w-24 text-[11px] font-bold text-slate-500 truncate pr-2">
-                    {brand?.name || '-'}
+                  <div className="w-32 text-[10px] font-bold text-slate-400 truncate pr-4">
+                    {editingId === product.id ? (
+                      <select
+                        value={editingCategoryId}
+                        onChange={e => setEditingCategoryId(e.target.value)}
+                        className="w-full bg-white border-b-2 border-amber-500 px-1 py-1 outline-none text-[10px] font-bold"
+                      >
+                        {categories.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      category?.name || '-'
+                    )}
                   </div>
-                  <div className="w-24 text-[11px] font-bold text-slate-500 truncate pr-2">
-                    {category?.name || '-'}
-                  </div>
-                  <div className="w-20 flex justify-center">
+                  <div className="w-24 flex justify-center">
                     <button 
                       onClick={() => setViewDetailsId(viewDetailsId === product.id ? null : product.id)}
                       className={cn(
-                        "text-[10px] font-black px-2 py-1 rounded-full transition-colors whitespace-nowrap",
-                        isDetailed ? "bg-teal-100 text-teal-600" : "bg-rose-100 text-rose-500"
+                        "text-[10px] font-black px-3 py-1.5 rounded-xl transition-all whitespace-nowrap shadow-sm border",
+                        isDetailed 
+                          ? "bg-amber-100 text-amber-600 border-amber-200" 
+                          : "bg-slate-50 text-slate-400 border-slate-200"
                       )}
                     >
                       Chi tiết
@@ -923,7 +1093,7 @@ function ProductTab({
                           onClick={() => handleSaveEdit(product.id)}
                           className="p-2 text-white bg-amber-500 rounded-lg active:scale-95"
                         >
-                          <Pencil className="w-4 h-4" />
+                          <Save className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => setEditingId(null)}
@@ -935,7 +1105,12 @@ function ProductTab({
                     ) : (
                       <>
                         <button 
-                          onClick={() => { setEditingId(product.id); setEditName(product.name); }}
+                          onClick={() => { 
+                            setEditingId(product.id); 
+                            setEditName(product.name);
+                            setEditingCategoryId(product.categoryId);
+                            setEditingBrandId(product.brandId);
+                          }}
                           className="p-2 text-amber-500 bg-amber-50 rounded-lg active:scale-95"
                         >
                           <Pencil className="w-4 h-4" />
@@ -952,22 +1127,24 @@ function ProductTab({
                 </div>
 
                 {viewDetailsId === product.id && (
-                  <div className="p-4 bg-pastel-bg/20 rounded-2xl mx-10 mb-2 border border-pastel-border/50 animate-in zoom-in-95 duration-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-xs font-black uppercase text-amber-500">Thông tin chi tiết</h4>
+                  <div className="p-5 bg-pastel-bg/20 rounded-2xl mx-10 mb-4 border border-pastel-border/50 animate-in zoom-in-95 duration-200 relative">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black uppercase text-amber-600 tracking-widest">Thông tin chi tiết sản phẩm</h4>
+                      </div>
                       <button 
                         onClick={() => setEditingDetailsId(editingDetailsId === product.id ? null : product.id)}
-                        className="text-[10px] font-bold bg-white px-2 py-1 rounded-lg border border-pastel-border hover:bg-amber-50 transition-colors"
+                        className="text-[10px] font-black bg-white px-3 py-1.5 rounded-xl border border-pastel-border hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all shadow-sm"
                       >
-                        {editingDetailsId === product.id ? "Huỷ" : "Sửa chi tiết"}
+                        {editingDetailsId === product.id ? "HUỶ BỎ" : "SỬA CHI TIẾT"}
                       </button>
                     </div>
 
                     {editingDetailsId === product.id ? (
                       <DetailEditor 
                         product={product} 
-                        brands={brands}
-                        categories={categories}
+                        skinIssues={skinIssues}
+                        mainIngredients={mainIngredients}
                         compressionSettings={compressionSettings}
                         setConfirmConfig={setConfirmConfig}
                         onSave={(updatedProduct) => {
@@ -976,17 +1153,54 @@ function ProductTab({
                         }} 
                       />
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[11px]">
-                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Giá nhập</div><div className="font-bold">{product.details?.importPrice?.toLocaleString() || '0'}đ</div></div>
-                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Giá bán</div><div className="font-bold">{product.details?.sellingPrice?.toLocaleString() || '0'}đ</div></div>
-                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Giá vốn</div><div className="font-bold">{product.details?.costPrice?.toLocaleString() || '0'}đ</div></div>
-                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Trọng lượng</div><div className="font-bold">{product.details?.weight || '-'}</div></div>
-                        <div className="col-span-2"><div className="text-[10px] font-black text-pastel-subtext uppercase">Công dụng</div><div className="font-bold">{product.details?.usage || '-'}</div></div>
-                        <div className="col-span-2"><div className="text-[10px] font-black text-pastel-subtext uppercase">Hướng dẫn</div><div className="font-bold">{product.details?.description || '-'}</div></div>
-                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Độ mạnh</div><div className="font-bold">{product.details?.strength || '-'}</div></div>
-                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Số ngày dùng</div><div className="font-bold">{product.details?.daysToUse || '0'} ngày</div></div>
-                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Ngày SX</div><div className="font-bold">{product.details?.mfgDate || '-'}</div></div>
-                        <div><div className="text-[10px] font-black text-pastel-subtext uppercase">Hạn SD</div><div className="font-bold">{product.details?.expDate || '-'}</div></div>
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[11px]">
+                          <div className="bg-white p-3 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-1">Giá nhập</div><div className="font-black text-slate-700">{product.details?.importPrice?.toLocaleString() || '0'}đ</div></div>
+                          <div className="bg-white p-3 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-1">Giá bán</div><div className="font-black text-amber-600">{product.details?.sellingPrice?.toLocaleString() || '0'}đ</div></div>
+                          <div className="bg-white p-3 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-1">Giá vốn</div><div className="font-black text-slate-700">{product.details?.costPrice?.toLocaleString() || '0'}đ</div></div>
+                          <div className="bg-white p-3 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-1">Trọng lượng</div><div className="font-black text-slate-700">{product.details?.weight || '-'}</div></div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11px]">
+                          <div className="bg-white p-4 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-2">Công dụng</div><div className="font-bold text-slate-600 leading-relaxed">{product.details?.usage || '-'}</div></div>
+                          <div className="bg-white p-4 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-2">Hướng dẫn</div><div className="font-bold text-slate-600 leading-relaxed">{product.details?.description || '-'}</div></div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[11px]">
+                          <div className="bg-white p-3 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-1">Độ mạnh</div><div className="font-black text-slate-700">{product.details?.strength || '-'}</div></div>
+                          <div className="bg-white p-3 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-1">Số ngày dùng</div><div className="font-black text-slate-700 font-mono tracking-tighter">{product.details?.daysToUse || '0'} ngày</div></div>
+                          <div className="bg-white p-3 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-1">SẢN XUẤT (MFG)</div><div className="font-black text-slate-700 font-mono tracking-tighter">{formatDate(product.details?.mfgDate)}</div></div>
+                          <div className="bg-white p-3 rounded-xl border border-pastel-border/50 shadow-sm"><div className="text-[10px] font-black text-pastel-subtext uppercase mb-1">HẠN SỬ DỤNG (EXP)</div><div className="font-black text-rose-500 font-mono tracking-tighter">{formatDate(product.details?.expDate)}</div></div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="bg-white p-4 rounded-xl border border-pastel-border/50 shadow-sm">
+                            <div className="text-[10px] font-black text-pastel-subtext uppercase mb-2">Vấn đề da</div>
+                            <div className="flex flex-wrap gap-1">
+                              {product.details?.skinIssues && product.details.skinIssues.length > 0 ? (
+                                product.details.skinIssues.map(id => {
+                                  const issue = skinIssues.find(s => s.id === id);
+                                  return issue ? <span key={id} className="text-[9px] font-black bg-amber-50 text-amber-600 px-2 py-1 rounded-lg border border-amber-100">{issue.name}</span> : null;
+                                })
+                              ) : (
+                                <span className="text-[10px] font-bold text-slate-300">Chưa chọn</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl border border-pastel-border/50 shadow-sm">
+                            <div className="text-[10px] font-black text-pastel-subtext uppercase mb-2">Thành phần chính</div>
+                            <div className="flex flex-wrap gap-1">
+                              {product.details?.mainIngredients && product.details.mainIngredients.length > 0 ? (
+                                product.details.mainIngredients.map(id => {
+                                  const ing = mainIngredients.find(i => i.id === id);
+                                  return ing ? <span key={id} className="text-[9px] font-black bg-sky-50 text-sky-600 px-2 py-1 rounded-lg border border-sky-100">{ing.name}</span> : null;
+                                })
+                              ) : (
+                                <span className="text-[10px] font-bold text-slate-300">Chưa chọn</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -994,21 +1208,21 @@ function ProductTab({
               </div>
             );
           })}
-          {products.length === 0 && (
-            <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
-              Chưa có sản phẩm nào
+          {filteredProducts.length === 0 && (
+            <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-20 bg-slate-50/30">
+              Chưa có sản phẩm nào phù hợp với bộ lọc
             </div>
           )}
         </div>
         
-        {products.length > 0 && (
+        {filteredProducts.length > 0 && (
           <Pagination 
             currentPage={currentPage}
             totalPages={totalPages}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={setPageSize}
-            totalItems={products.length}
+            totalItems={filteredProducts.length}
           />
         )}
       </div>
@@ -1018,13 +1232,15 @@ function ProductTab({
 
 function DetailEditor({ 
   product, 
+  skinIssues,
+  mainIngredients,
   onSave, 
   compressionSettings, 
   setConfirmConfig 
 }: { 
   product: Product, 
-  brands: Brand[], 
-  categories: ProductCategory[], 
+  skinIssues: SkinIssue[],
+  mainIngredients: Ingredient[],
   onSave: (p: Product) => void,
   compressionSettings: ImageCompressionSettings,
   setConfirmConfig: any
@@ -1039,7 +1255,11 @@ function DetailEditor({
     strength: product.details?.strength || "",
     daysToUse: product.details?.daysToUse?.toString() || "",
     mfgDate: product.details?.mfgDate || "",
-    expDate: product.details?.expDate || ""
+    expDate: product.details?.expDate || "",
+    skinIssues: product.details?.skinIssues || [] as string[],
+    mainIngredients: product.details?.mainIngredients || [] as string[],
+    categoryId: product.categoryId || "",
+    brandId: product.brandId || ""
   });
   const [imageUrl, setImageUrl] = useState(product.imageUrl || "");
   const [isUploading, setIsUploading] = useState(false);
@@ -1049,12 +1269,6 @@ function DetailEditor({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const MAX_SIZE = 1 * 1024 * 1024;
-      if (file.size > MAX_SIZE) {
-        alert(`Ảnh quá lớn (${(file.size / (1024 * 1024)).toFixed(2)}MB). Giới hạn tối đa là 1MB.`);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
-      }
       const reader = new FileReader();
       reader.onload = () => {
         setCropperData(reader.result as string);
@@ -1095,6 +1309,9 @@ function DetailEditor({
     onSave({
       ...product,
       imageUrl: imageUrl || undefined,
+      categoryId: data.categoryId || product.categoryId,
+      brandId: data.brandId || product.brandId,
+      typeId: data.categoryId || product.typeId, // Sync typeId with categoryId
       details: {
         importPrice: data.importPrice ? Number(data.importPrice) : undefined,
         sellingPrice: data.sellingPrice ? Number(data.sellingPrice) : undefined,
@@ -1105,7 +1322,9 @@ function DetailEditor({
         strength: data.strength || undefined,
         daysToUse: data.daysToUse ? Number(data.daysToUse) : undefined,
         mfgDate: data.mfgDate || undefined,
-        expDate: data.expDate || undefined
+        expDate: data.expDate || undefined,
+        skinIssues: data.skinIssues.length > 0 ? data.skinIssues : undefined,
+        mainIngredients: data.mainIngredients.length > 0 ? data.mainIngredients : undefined
       }
     });
   };
@@ -1225,7 +1444,7 @@ function DetailEditor({
         />
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Ngày SX (MFG)</label>
+        <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">SẢN XUẤT(MFG)</label>
         <input 
           type="date" 
           value={data.mfgDate}
@@ -1234,13 +1453,63 @@ function DetailEditor({
         />
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Hạn SD (EXP)</label>
+        <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">HẠN SỬ DỤNG (EXP)</label>
         <input 
           type="date" 
           value={data.expDate}
           onChange={e => setData(prev => ({ ...prev, expDate: e.target.value }))}
           className="w-full bg-pastel-bg rounded-lg px-3 py-2 text-xs font-bold outline-none border border-transparent focus:border-amber-300" 
         />
+      </div>
+
+      <div className="space-y-1 col-span-2">
+        <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Vấn đề da</label>
+        <div className="flex flex-wrap gap-1 bg-pastel-bg p-2 rounded-lg border border-transparent focus-within:border-amber-300 min-h-[40px]">
+          {skinIssues.map(issue => (
+            <button
+              key={issue.id}
+              onClick={() => {
+                setData(prev => ({
+                  ...prev,
+                  skinIssues: prev.skinIssues.includes(issue.id) 
+                    ? prev.skinIssues.filter(id => id !== issue.id)
+                    : [...prev.skinIssues, issue.id]
+                }));
+              }}
+              className={cn(
+                "text-[9px] px-2 py-0.5 rounded-full font-bold transition-colors",
+                data.skinIssues.includes(issue.id) ? "bg-amber-500 text-white" : "bg-white text-slate-500 border border-pastel-border"
+              )}
+            >
+              {issue.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1 col-span-2">
+        <label className="text-[10px] font-black uppercase text-pastel-subtext ml-1">Thành phần chính</label>
+        <div className="flex flex-wrap gap-1 bg-pastel-bg p-2 rounded-lg border border-transparent focus-within:border-amber-300 min-h-[40px]">
+          {mainIngredients.map(ing => (
+            <button
+              key={ing.id}
+              onClick={() => {
+                setData(prev => ({
+                  ...prev,
+                  mainIngredients: prev.mainIngredients.includes(ing.id) 
+                    ? prev.mainIngredients.filter(id => id !== ing.id)
+                    : [...prev.mainIngredients, ing.id]
+                }));
+              }}
+              className={cn(
+                "text-[9px] px-2 py-0.5 rounded-full font-bold transition-colors",
+                data.mainIngredients.includes(ing.id) ? "bg-amber-500 text-white" : "bg-white text-slate-500 border border-pastel-border"
+              )}
+            >
+              {ing.name}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="col-span-full flex justify-end mt-2">
         <button 
@@ -1277,6 +1546,8 @@ function SkinIssueTab({
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const sortedIssues = useMemo(() => {
     return [...skinIssues].sort((a, b) => 
@@ -1284,9 +1555,16 @@ function SkinIssueTab({
     );
   }, [skinIssues, sortAsc]);
 
+  const paginatedIssues = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedIssues.slice(start, start + pageSize);
+  }, [sortedIssues, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(skinIssues.length / pageSize);
+
   const handleAdd = () => {
     if (!newName.trim()) return;
-    const newIssue: SkinIssue = { id: `skin-${Date.now()}`, name: newName.trim() };
+    const newIssue: SkinIssue = { id: `skin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: newName.trim() };
     onUpdateSkinIssues([...skinIssues, newIssue]);
     setNewName("");
   };
@@ -1308,110 +1586,270 @@ function SkinIssueTab({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-[32px] p-6 shadow-sm border border-pastel-border/50">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h3 className="text-xl font-black text-slate-800">Vấn đề da</h3>
-          <p className="text-xs font-bold text-slate-400 mt-1">Quản lý danh sách các vấn đề da</p>
+    <div className="flex flex-col min-h-full space-y-4">
+      {/* Top bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <input 
+            type="text"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            placeholder="Nhập tên vấn đề mới..."
+            className="flex-1 min-w-0 bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors"
+          />
+          <button 
+            onClick={handleAdd}
+            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform whitespace-nowrap"
+          >
+            Tạo
+          </button>
+          <button 
+            onClick={() => setSortAsc(!sortAsc)}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none"
+          >
+            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
+          </button>
         </div>
-        <button
-          onClick={() => setSortAsc(!sortAsc)}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl font-bold text-xs transition-colors border border-slate-200"
-        >
-          {sortAsc ? <ArrowDownAZ className="w-4 h-4" /> : <ArrowUpZA className="w-4 h-4" />}
-          Sắp xếp
-        </button>
       </div>
 
-      <div className="flex gap-3 mb-8">
-        <input
-          type="text"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          placeholder="Nhập tên vấn đề mới..."
-          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-amber-300 focus:bg-white transition-all shadow-sm"
-        />
-        <button
-          onClick={handleAdd}
-          disabled={!newName.trim()}
-          className="px-6 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:hover:bg-amber-500 text-white rounded-xl font-black text-sm transition-colors shadow-lg shadow-amber-200 flex items-center gap-2 shrink-0"
-        >
-          <Plus className="w-5 h-5" /> Thêm
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-2 overflow-y-auto no-scrollbar pb-20">
-        {/* Header Row */}
-        <div className="flex items-center px-6 pt-2 pb-4 border-b-2 border-slate-100 sticky top-0 bg-white z-10 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-          <div className="w-16">STT</div>
+      {/* List */}
+      <div className="flex-1 border border-pastel-border bg-white rounded-3xl overflow-hidden flex flex-col">
+        <div className="flex px-4 py-3 bg-pastel-bg border-b border-pastel-border text-xs font-black text-pastel-subtext uppercase">
+          <div className="w-16 text-center">Số thứ tự</div>
           <div className="flex-1">Tên vấn đề da</div>
-          <div className="w-24 text-right pr-2">Thao tác</div>
+          <div className="w-24 text-right">Thao tác</div>
         </div>
-
-        {/* Rows */}
-        {sortedIssues.map((issue, idx) => (
-          <div key={issue.id} className="flex items-center px-6 py-4 bg-slate-50/50 hover:bg-amber-50/30 border border-slate-100 hover:border-amber-200 rounded-2xl transition-all group">
-            <div className="w-16 font-black text-slate-300 text-lg">
-              {(idx + 1).toString().padStart(2, '0')}
-            </div>
-            <div className="flex-1">
-              {editingId === issue.id ? (
-                <input 
-                  type="text"
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleSaveEdit(issue.id);
-                    if (e.key === 'Escape') setEditingId(null);
-                  }}
-                  autoFocus
-                  className="w-full max-w-[300px] bg-white border-2 border-amber-300 rounded-lg px-3 py-1.5 text-sm font-bold outline-none"
-                />
-              ) : (
-                <span className="font-bold text-slate-700 text-sm">{issue.name}</span>
-              )}
-            </div>
-            <div className="w-24 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {editingId === issue.id ? (
-                <>
-                  <button onClick={() => handleSaveEdit(issue.id)} className="w-8 h-8 flex items-center justify-center rounded-lg text-emerald-500 hover:bg-emerald-50 transition-colors">
-                    <Save className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setEditingId(null)} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition-colors">
-                    <X className="w-4 h-4" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button 
-                    onClick={() => {
-                      setEditingId(issue.id);
-                      setEditName(issue.name);
+        <div className="flex-1 overflow-y-auto p-2 space-y-2 border-b border-pastel-border">
+          {paginatedIssues.map((issue, idx) => (
+            <div key={issue.id} className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors font-sans">
+              <div className="w-16 text-center text-sm font-bold text-pastel-subtext font-mono">
+                {(currentPage - 1) * pageSize + idx + 1}
+              </div>
+              <div className="flex-1 font-bold text-sm text-slate-700">
+                {editingId === issue.id ? (
+                  <input 
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveEdit(issue.id);
+                      if (e.key === 'Escape') setEditingId(null);
                     }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-amber-500 hover:bg-amber-50 transition-colors"
-                    title="Sửa"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(issue.id, issue.name)}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50 transition-colors"
-                    title="Xóa"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </>
-              )}
+                    autoFocus
+                    className="w-full bg-white border-b-2 border-amber-500 px-2 py-1 outline-none"
+                  />
+                ) : (
+                  <span className="">{issue.name}</span>
+                )}
+              </div>
+              <div className="w-24 flex items-center justify-end gap-1">
+                {editingId === issue.id ? (
+                  <>
+                    <button onClick={() => handleSaveEdit(issue.id)} className="p-2 text-white bg-amber-500 rounded-lg active:scale-95">
+                      <Save className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="p-2 text-slate-500 bg-slate-100 rounded-lg active:scale-95">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => { setEditingId(issue.id); setEditName(issue.name); }}
+                      className="p-2 text-amber-500 bg-amber-50 rounded-lg active:scale-95"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(issue.id, issue.name)}
+                      className="p-2 text-red-500 bg-red-50 rounded-lg active:scale-95"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+          {skinIssues.length === 0 && (
+            <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
+              Chưa có vấn đề da nào
+            </div>
+          )}
+        </div>
+        
+        {skinIssues.length > 0 && (
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            totalItems={skinIssues.length}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
-        {sortedIssues.length === 0 && (
-          <div className="py-20 text-center">
-            <Tags className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-            <p className="text-slate-400 font-medium text-sm">Chưa có vấn đề da nào</p>
-          </div>
+// IngredientTab Component
+function IngredientTab({ 
+  ingredients, 
+  onUpdateIngredients, 
+  setConfirmConfig 
+}: { 
+  ingredients: Ingredient[], 
+  onUpdateIngredients: (c: Ingredient[]) => void, 
+  setConfirmConfig: any 
+}) {
+  const [sortAsc, setSortAsc] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const sortedIngredients = useMemo(() => {
+    return [...ingredients].sort((a, b) => 
+      sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
+    );
+  }, [ingredients, sortAsc]);
+
+  const paginatedIngredients = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedIngredients.slice(start, start + pageSize);
+  }, [sortedIngredients, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(ingredients.length / pageSize);
+
+  const handleAdd = () => {
+    if (!newName.trim()) return;
+    const newIngredient: Ingredient = { id: `ingr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: newName.trim() };
+    onUpdateIngredients([...ingredients, newIngredient]);
+    setNewName("");
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (!editName.trim()) return;
+    onUpdateIngredients(ingredients.map(c => c.id === id ? { ...c, name: editName.trim() } : c));
+    setEditingId(null);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    setConfirmConfig({
+      message: `Bạn có chắc chắn muốn xóa thành phần "${name}"?`,
+      action: () => {
+        onUpdateIngredients(ingredients.filter(c => c.id !== id));
+        setConfirmConfig(null);
+      }
+    });
+  };
+
+  return (
+    <div className="flex flex-col min-h-full space-y-4">
+      {/* Top bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white p-4 rounded-3xl border border-pastel-border">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <input 
+            type="text"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            placeholder="Nhập tên thành phần mới..."
+            className="flex-1 min-w-0 bg-pastel-bg rounded-xl px-4 py-3 text-sm font-bold outline-none border border-transparent focus:border-amber-300 transition-colors"
+          />
+          <button 
+            onClick={handleAdd}
+            className="bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-amber-200 active:scale-95 transition-transform whitespace-nowrap"
+          >
+            Tạo
+          </button>
+          <button 
+            onClick={() => setSortAsc(!sortAsc)}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-pastel-bg text-slate-600 rounded-xl font-bold active:scale-95 transition-all outline-none"
+          >
+            {sortAsc ? <ArrowDownAZ className="w-5 h-5 text-amber-500" /> : <ArrowUpZA className="w-5 h-5 text-amber-500" />}
+          </button>
+        </div>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 border border-pastel-border bg-white rounded-3xl overflow-hidden flex flex-col">
+        <div className="flex px-4 py-3 bg-pastel-bg border-b border-pastel-border text-xs font-black text-pastel-subtext uppercase">
+          <div className="w-16 text-center">Số thứ tự</div>
+          <div className="flex-1">Tên thành phần</div>
+          <div className="w-24 text-right">Thao tác</div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-2 border-b border-pastel-border">
+          {paginatedIngredients.map((ingredient, idx) => (
+            <div key={ingredient.id} className="flex items-center px-2 py-2 hover:bg-pastel-bg rounded-2xl transition-colors font-sans">
+              <div className="w-16 text-center text-sm font-bold text-pastel-subtext font-mono">
+                {(currentPage - 1) * pageSize + idx + 1}
+              </div>
+              <div className="flex-1 font-bold text-sm text-slate-700">
+                {editingId === ingredient.id ? (
+                  <input 
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSaveEdit(ingredient.id);
+                      if (e.key === 'Escape') setEditingId(null);
+                    }}
+                    autoFocus
+                    className="w-full bg-white border-b-2 border-amber-500 px-2 py-1 outline-none"
+                  />
+                ) : (
+                  <span className="">{ingredient.name}</span>
+                )}
+              </div>
+              <div className="w-24 flex items-center justify-end gap-1">
+                {editingId === ingredient.id ? (
+                  <>
+                    <button onClick={() => handleSaveEdit(ingredient.id)} className="p-2 text-white bg-amber-500 rounded-lg active:scale-95">
+                      <Save className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="p-2 text-slate-500 bg-slate-100 rounded-lg active:scale-95">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => { setEditingId(ingredient.id); setEditName(ingredient.name); }}
+                      className="p-2 text-amber-500 bg-amber-50 rounded-lg active:scale-95"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(ingredient.id, ingredient.name)}
+                      className="p-2 text-red-500 bg-red-50 rounded-lg active:scale-95"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {ingredients.length === 0 && (
+            <div className="h-full flex items-center justify-center text-pastel-subtext italic text-sm py-10">
+              Chưa có thành phần nào
+            </div>
+          )}
+        </div>
+        
+        {ingredients.length > 0 && (
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            totalItems={ingredients.length}
+          />
         )}
       </div>
     </div>

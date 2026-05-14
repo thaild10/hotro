@@ -52,10 +52,11 @@ interface CardProps {
   onTagEdit: () => void;
   onHistory: () => void;
   onNoteEdit: () => void;
-  onDoctorReply: () => void;
+  onDoctorReply: (index?: number) => void;
   onNotify: () => void;
   onAddDo?: () => void;
   updateCard: (id: string, updates: Partial<KanbanCard>) => void;
+  confirmAction: (message: string, action: () => void) => void;
 }
 
 export default function Card({ 
@@ -73,7 +74,8 @@ export default function Card({
   onDoctorReply, 
   onNotify,
   onAddDo,
-  updateCard
+  updateCard,
+  confirmAction
 }: CardProps) {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const isDone = card.tabId === 7;
@@ -84,11 +86,16 @@ export default function Card({
   };
 
   const handleNotify = () => {
-    updateCard(card.id, { 
-      notified: true, 
-      notifiedTime: `Đã báo: ${getTimeFormatted()}` 
+    confirmAction("Bạn có chắc muốn báo khách?", () => {
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      updateCard(card.id, { 
+        notified: true, 
+        notifiedTime: `Đã báo ${dd}.${mm}` 
+      });
+      onNotify();
     });
-    onNotify();
   };
 
   const tags = card.tags || [];
@@ -146,7 +153,7 @@ export default function Card({
         <div className="flex items-center gap-2 shrink-0">
           {!isCollapsed && (
             <div className="flex items-center gap-2">
-              {card.doctorText && !card.doctorHidden && (
+              {card.doctorReplies && card.doctorReplies.length > 0 && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -166,7 +173,7 @@ export default function Card({
                 onClick={onDoctorReply} 
                 className={cn(
                   "text-[10px] font-black px-3 py-2 rounded-xl flex items-center gap-1 border active:scale-95 transition-all h-9",
-                  (card.doctorText && !card.doctorHidden && !card.replyAgain) 
+                  (card.doctorReplies && card.doctorReplies.length > 0 && !card.replyAgain) 
                     ? "bg-violet-50 text-violet-300 border-violet-50 pointer-events-none opacity-50" 
                     : "bg-violet-50 text-violet-500 border-violet-100"
                 )}
@@ -196,7 +203,7 @@ export default function Card({
             <>
               <span className="text-pastel-subtext">·</span>
               <span className="flex items-center gap-0.5 text-teal-500">
-                <CheckCircle className="w-3 h-3" /> Xong <b>{card.doneDate}</b>
+                <CheckCircle className="w-3 h-3" /> Xong <b>{card.doneDate.split('.').slice(0, 2).join('.')}</b>
               </span>
             </>
           )}
@@ -218,37 +225,51 @@ export default function Card({
         </div>
 
         {(() => {
-          if (card.doctorHidden || !card.doctorText) return null;
-          const replies = card.doctorReplies || [{ text: card.doctorText, date: card.doctorDate || '' }];
+          const replies = card.doctorReplies || [];
+          if (replies.length === 0) return null;
+          
           return (
             <div className="space-y-2 mt-2">
               {replies.map((reply, idx) => {
-                const isLate = idx === replies.length - 1;
+                const isLatest = idx === replies.length - 1;
                 const formattedDate = reply.date ? reply.date.split('.').slice(0, 2).join('.') : '';
                 return (
                   <div key={idx} className={cn(
                     "border-l-4 p-4 rounded-r-2xl relative",
-                    isLate ? "bg-violet-50/50 border-violet-300" : "bg-slate-50 border-slate-200"
+                    isLatest ? "bg-violet-50/50 border-violet-300 shadow-sm" : "bg-slate-50 border-slate-200 opacity-60"
                   )}>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={cn("text-xs font-black", isLate ? "text-violet-500" : "text-slate-400")}>{formattedDate}</span>
-                      <span className={cn("text-xs font-black", isLate ? "text-violet-500" : "text-slate-400")}>Bác sĩ trả lời:</span>
+                      <span className={cn("text-xs font-black", isLatest ? "text-violet-500" : "text-slate-400")}>Bác sĩ trả lời {formattedDate}</span>
                     </div>
                     <p className={cn(
-                      "text-sm mb-3 whitespace-pre-line font-medium",
-                      isLate ? "text-pastel-text/90 italic" : "text-slate-400"
+                      "text-sm mb-3 whitespace-pre-line",
+                      isLatest ? "text-pastel-text font-black" : "text-slate-400 font-medium"
                     )}>
                       {reply.text}
                     </p>
-                    {isLate && (
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={onDoctorReply} 
-                          className="px-3 py-2 rounded-xl bg-white border border-violet-200 text-violet-500 font-bold text-xs active:scale-95 min-h-[36px]"
-                        >
-                          Sửa
-                        </button>
-                        {card.notified ? (
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => onDoctorReply(idx)} 
+                        className="px-3 py-2 rounded-xl bg-white border border-violet-200 text-violet-500 font-bold text-xs active:scale-95 min-h-[36px]"
+                      >
+                        Sửa
+                      </button>
+                      <button 
+                        onClick={() => {
+                          confirmAction("Xóa phản hồi này?", () => {
+                            const newReplies = replies.filter((_, i) => i !== idx);
+                            updateCard(card.id, { 
+                              doctorReplies: newReplies,
+                              doctorText: newReplies.length > 0 ? newReplies[newReplies.length - 1].text : ""
+                            });
+                          });
+                        }} 
+                        className="px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-500 font-bold text-xs active:scale-95 min-h-[36px]"
+                      >
+                        Xóa
+                      </button>
+                      {isLatest && (
+                        card.notified ? (
                           <span className="bg-teal-50 text-teal-600 border border-teal-200 px-3 py-2 rounded-xl font-bold text-xs min-h-[36px] flex items-center">
                             {card.notifiedTime}
                           </span>
@@ -259,9 +280,9 @@ export default function Card({
                           >
                             Báo khách
                           </button>
-                        )}
-                      </div>
-                    )}
+                        )
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -354,7 +375,7 @@ export default function Card({
                 {card.tabId === 7 && card.doneDate && (
                   <div className="flex items-center gap-1.5 text-teal-600">
                     <CheckCircle className="w-4 h-4" />
-                    <span className="ml-0.5">Xong</span> <span>{card.doneDate}</span>
+                    <span className="ml-0.5">Xong</span> <span>{card.doneDate.split('.').slice(0, 2).join('.')}</span>
                   </div>
                 )}
               </div>
@@ -434,9 +455,23 @@ export default function Card({
               {isDone && (
                 <button 
                   onClick={onMoveBack}
-                  className="px-4 py-2 rounded-xl bg-slate-50 text-slate-500 font-bold text-xs border border-slate-200 active:scale-95 transition-all h-9 flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-slate-50 text-slate-500 font-bold text-[10px] border border-slate-200 active:scale-95 transition-all h-9 flex items-center gap-1.5 whitespace-nowrap"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" /> Quay lại
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  {(() => {
+                    const moveLogs = (card.logs || []).filter(l => l.includes("Chuyển sang"));
+                    const prevMoveLog = moveLogs[1];
+                    let targetName = "bước trước";
+                    if (prevMoveLog) {
+                      for (const [id, name] of Object.entries(TAB_NAMES)) {
+                        if (prevMoveLog.includes(`Chuyển sang ${name}`) || prevMoveLog.includes(`Chuyển sang ${id}.`)) {
+                          targetName = name;
+                          break;
+                        }
+                      }
+                    }
+                    return `Quay lại ${targetName}`;
+                  })()}
                 </button>
               )}
               <button 

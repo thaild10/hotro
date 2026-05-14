@@ -21,9 +21,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
-  Order, 
-  OrderItem, 
-  Customer, 
+  ImportOrder, 
+  ImportItem, 
+  Supplier, 
   Product, 
   LedgerTransaction, 
   LedgerPurpose,
@@ -33,23 +33,34 @@ import {
   ImageCompressionSettings,
   SkinAuditEntry,
   SkinAuditLog,
-  SkinIssue
+  SkinIssue,
+  UserAccount,
+  Order,
+  OrderItem,
+  Customer,
+  Brand
 } from "../../types";
 import { cn, getTodayIso, formatIsoToPretty } from "../../lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
 import CustomerManagementModal from "./CustomerManagementModal";
 import { VIETNAM_LOCATIONS } from "../../constants/locations";
 import { Pagination } from "../Pagination";
+import { auth } from "../../firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 interface OrderManagementModalProps {
   orders: Order[];
+  importOrders: ImportOrder[];
+  suppliers: Supplier[];
   customers: Customer[];
   products: Product[];
   ledgerTransactions: LedgerTransaction[];
   ledgerPurposes: LedgerPurpose[];
   ledgerAccounts: LedgerAccount[];
   ledgerLogs: LedgerLog[];
+  users: UserAccount[];
   onUpdateOrders: (orders: Order[]) => void;
+  onUpdateImportOrders: (orders: ImportOrder[]) => void;
   onUpdateTransactions: (transactions: LedgerTransaction[]) => void;
   onUpdateLogs: (logs: LedgerLog[]) => void;
   onUpdateCustomers: (customers: Customer[]) => void;
@@ -61,6 +72,7 @@ interface OrderManagementModalProps {
   skinAudits: SkinAuditEntry[];
   skinAuditLogs: SkinAuditLog[];
   skinIssues: SkinIssue[];
+  brands: Brand[];
   onUpdateSkinAudits: (audits: SkinAuditEntry[]) => void;
   onUpdateSkinAuditLogs: (logs: SkinAuditLog[]) => void;
   username: string;
@@ -71,13 +83,17 @@ interface OrderManagementModalProps {
 
 export default function OrderManagementModal({
   orders,
+  importOrders,
+  suppliers,
   customers,
   products,
   ledgerTransactions,
   ledgerPurposes,
   ledgerAccounts,
   ledgerLogs,
+  users,
   onUpdateOrders,
+  onUpdateImportOrders,
   onUpdateTransactions,
   onUpdateLogs,
   onUpdateCustomers,
@@ -89,6 +105,7 @@ export default function OrderManagementModal({
   skinAudits,
   skinAuditLogs,
   skinIssues,
+  brands,
   onUpdateSkinAudits,
   onUpdateSkinAuditLogs,
   username,
@@ -96,15 +113,62 @@ export default function OrderManagementModal({
   deviceView = 'desktop',
   isPage = false
 }: OrderManagementModalProps) {
+  const [activeTab, setActiveTab] = useState<'sales' | 'import'>('sales');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
+  const [pinInput, setPinInput] = useState<{message: string, action: () => void} | null>(null);
+  const [pinValue, setPinValue] = useState("");
+  const [pinError, setPinError] = useState(false);
+  
+  const handleAddItem = () => {
+    setFormState(prev => ({
+      ...prev,
+      items: [...prev.items, { productId: "", quantity: 1, unitPrice: 0, discount: 0, subtotal: 0, discountType: 'amount' as const, discountValue: 0 }]
+    }));
+  };
+
+  const handleRemoveItem = (index: number) => {
+    if (formState.items.length <= 1) return;
+    setFormState(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const userPassword = useMemo(() => users?.find(u => u.username === username)?.password, [users, username]);
+
+  const handlePinConfirm = async () => {
+    const actualPassword = userPassword || "1234";
+    let isValid = pinValue === actualPassword;
+    if (!isValid) {
+      try {
+        const loginEmail = auth.currentUser?.email || (username.includes('@') ? username : `${username}@app.local`);
+        await signInWithEmailAndPassword(auth, loginEmail, pinValue);
+        isValid = true;
+      } catch (err) { isValid = false; }
+    }
+    if (isValid) {
+      const action = pinInput?.action;
+      setPinInput(null);
+      setPinValue("");
+      setPinError(false);
+      action?.();
+    } else {
+      setPinError(true);
+      setTimeout(() => setPinError(false), 500);
+    }
+  };
+
+  const requirePin = (message: string, action: () => void) => {
+    setPinInput({ message, action });
+  };
 
   const getCustomerBalance = (customerId: string) => {
-    const customer = customers.find(c => c.id === customerId);
+    const customer = customers?.find(c => c.id === customerId);
     const initial = customer?.initialDebt || 0;
-    const customerTx = ledgerTransactions.filter(t => t.customerId === customerId);
+    const customerTx = ledgerTransactions?.filter(t => t.customerId === customerId) || [];
     const thu = customerTx.filter(t => t.type === 'Thu').reduce((sum, t) => sum + t.amount, 0);
     const chi = customerTx.filter(t => t.type === 'Chi').reduce((sum, t) => sum + t.amount, 0);
     return initial + (chi - thu);
@@ -119,21 +183,26 @@ export default function OrderManagementModal({
     return orders.slice(start, start + pageSize);
   }, [orders, currentPage, pageSize]);
 
-  const totalPages = Math.ceil(orders.length / pageSize);
+  const totalPages = Math.ceil((activeTab === 'sales' ? orders.length : importOrders.length) / pageSize);
 
   // Autocomplete state
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  
+  const [productSearchIndex, setProductSearchIndex] = useState<number | null>(null);
+  const [productSearch, setProductSearch] = useState("");
 
   // Form state
   const [formState, setFormState] = useState<{
     customerId: string;
-    items: (OrderItem & { discountType: 'amount' | 'percent', discountValue: number })[];
+    supplierId: string;
+    items: (OrderItem & { discountType: 'amount' | 'percent', discountValue: number, subtotal: number })[];
     city: string;
     district: string;
     address: string;
   }>({
     customerId: "",
+    supplierId: "",
     items: [{ productId: "", quantity: 1, unitPrice: 0, discount: 0, subtotal: 0, discountType: 'amount', discountValue: 0 }],
     city: "",
     district: "",
@@ -141,13 +210,23 @@ export default function OrderManagementModal({
   });
 
   const customerSuggestions = useMemo(() => {
-    if (!customerSearch.trim()) return customers.slice(0, 50);
-    return customers.filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()));
+    if (customerSearch.length < 3) return [];
+    return customers?.filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase())) || [];
   }, [customers, customerSearch]);
 
+  const productSuggestions = useMemo(() => {
+    if (productSearch.length < 3) return [];
+    return products?.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())) || [];
+  }, [products, productSearch]);
+
   const selectedCustomer = useMemo(() => 
-    customers.find(c => c.id === formState.customerId), 
+    customers?.find(c => c.id === formState.customerId), 
     [customers, formState.customerId]
+  );
+
+  const selectedSupplier = useMemo(() => 
+    suppliers?.find(s => s.id === formState.supplierId), 
+    [suppliers, formState.supplierId]
   );
 
   const handleSelectCustomer = (cust: Customer) => {
@@ -169,127 +248,117 @@ export default function OrderManagementModal({
     }
   }, [selectedCustomer]);
 
-  const handleAddItem = () => {
-    setFormState(prev => ({
-      ...prev,
-      items: [...prev.items, { productId: "", quantity: 1, unitPrice: 0, discount: 0, subtotal: 0, discountType: 'amount', discountValue: 0 }]
-    }));
-  };
-
-  const handleItemChange = (index: number, updates: Partial<OrderItem & { discountType: 'amount' | 'percent', discountValue: number }>) => {
+  const handleItemChange = (index: number, updates: Partial<typeof formState.items[0]>) => {
     setFormState(prev => {
       const newItems = [...prev.items];
-      const product = products.find(p => p.id === updates.productId || (updates.productId === undefined && newItems[index].productId === p.id));
+      const product = products?.find(p => p.id === updates.productId || (updates.productId === undefined && newItems[index].productId === p.id));
       
       const item = { ...newItems[index], ...updates };
       
-      // If product changed, auto-fill price and dates
       if (updates.productId !== undefined && product) {
-        item.unitPrice = product.price || product.details?.sellingPrice || 0;
-        item.mfgDate = product.details?.mfgDate || undefined;
-        item.expDate = product.details?.expDate || undefined;
+        item.unitPrice = activeTab === 'sales' ? (product.price || product.details?.sellingPrice || 0) : (product.details?.importPrice || 0);
       }
 
-      // Calculate discount amount
+      // Calculate discount value
+      let discountVal = item.discountValue;
       if (item.discountType === 'percent') {
-        item.discount = Math.round((item.unitPrice * item.quantity) * (item.discountValue / 100));
-      } else {
-        item.discount = item.discountValue;
+        discountVal = Math.round((item.unitPrice * item.quantity * item.discountValue) / 100);
       }
-      
+      item.discount = discountVal;
+
       item.subtotal = (item.unitPrice * item.quantity) - item.discount;
       newItems[index] = item;
-      
-      // Auto-add new row if the last item's product is filled
+
+      // Auto-add new row
       if (index === newItems.length - 1 && item.productId) {
         newItems.push({ productId: "", quantity: 1, unitPrice: 0, discount: 0, subtotal: 0, discountType: 'amount', discountValue: 0 });
       }
-      
+
       return { ...prev, items: newItems };
     });
   };
 
-  const handleRemoveItem = (index: number) => {
-    if (formState.items.length === 1) return;
-    setFormState(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
-  };
-
-  const totalAmountAfterDiscount = useMemo(() => {
-    return formState.items.reduce((sum, item) => sum + item.subtotal, 0);
+  const totals = useMemo(() => {
+    const validItems = formState.items.filter(i => i.productId);
+    const qty = validItems.reduce((sum, i) => sum + i.quantity, 0);
+    const totalBeforeDiscount = validItems.reduce((sum, i) => sum + (i.unitPrice * i.quantity), 0);
+    const totalDiscount = validItems.reduce((sum, i) => sum + i.discount, 0);
+    const totalAfterDiscount = totalBeforeDiscount - totalDiscount;
+    return { qty, totalBeforeDiscount, totalDiscount, totalAfterDiscount };
   }, [formState.items]);
 
   const handleSave = () => {
     const validItems = formState.items.filter(item => item.productId && item.quantity > 0);
-    if (!formState.customerId || validItems.length === 0) return;
+    if (activeTab === 'sales' && (!formState.customerId || validItems.length === 0)) return;
+    if (activeTab === 'import' && (!formState.supplierId || validItems.length === 0)) return;
 
     setConfirmConfig({
-      message: editingId ? "Xác nhận cập nhật đơn hàng?" : "Xác nhận tạo đơn hàng mới?",
+      message: editingId ? `Xác nhận cập nhật ${activeTab === 'sales' ? 'đơn hàng' : 'phiếu nhập'}?` : `Xác nhận tạo ${activeTab === 'sales' ? 'đơn hàng' : 'phiếu nhập'} mới?`,
       action: async () => {
-        const orderId = editingId || `ord-${Date.now()}`;
-        const chiPurpose = ledgerPurposes.find(p => p.name === 'Khách');
-        const defaultAccount = ledgerAccounts[0];
-
-        if (!chiPurpose || !defaultAccount) {
-          alert("Lỗi: Không tìm thấy mục đích 'Khách' hoặc tài khoản hợp lệ.");
-          return;
-        }
+        setConfirmConfig(null);
+        const orderId = editingId || (activeTab === 'sales' ? `ord-${Date.now()}` : `imp-${Date.now()}`);
+        const purposeName = activeTab === 'sales' ? 'Khách' : 'Nhập hàng';
+        const purpose = ledgerPurposes?.find(p => p.name === purposeName);
+        
+        // When creating order, set transaction without account linkage ("no account")
+        const accountId = ""; 
 
         const date = getTodayIso();
-        const shouldCreateTransaction = totalAmountAfterDiscount > 0;
+        const total = totals.totalAfterDiscount;
 
-        const transaction: LedgerTransaction | null = shouldCreateTransaction ? {
-          id: `tx-ord-${orderId}`,
-          accountId: defaultAccount.id,
-          purposeId: chiPurpose.id,
-          amount: totalAmountAfterDiscount,
+        const transaction: LedgerTransaction | null = total > 0 && purpose ? {
+          id: `tx-${activeTab === 'sales' ? 'ord' : 'imp'}-${orderId}`,
+          accountId,
+          purposeId: purpose.id,
+          amount: total,
           date,
-          reason: `Đơn hàng #${orderId.slice(-6).toUpperCase()}`,
-          type: 'Chi',
+          reason: `${activeTab === 'sales' ? 'Đơn hàng' : 'Nhập hàng'} #${orderId.slice(-6).toUpperCase()}`,
+          type: activeTab === 'sales' ? 'Thu' : 'Chi',
           createdAt: Date.now(),
-          customerId: formState.customerId
+          customerId: activeTab === 'sales' ? formState.customerId : undefined
         } : null;
 
-        const newOrder: Order = {
-          id: orderId,
-          customerId: formState.customerId,
-          items: validItems.map(({ discountType, discountValue, ...rest }) => rest),
-          totalAmount: totalAmountAfterDiscount,
-          date,
-          createdAt: Date.now(),
-          city: formState.city,
-          district: formState.district,
-          address: formState.address,
-          transactionId: transaction?.id
-        };
+        if (activeTab === 'sales') {
+          const newOrder: Order = {
+            id: orderId,
+            customerId: formState.customerId,
+            items: validItems.map(({ discountType, discountValue, ...rest }) => rest),
+            totalAmount: total,
+            date,
+            createdAt: Date.now(),
+            city: formState.city,
+            district: formState.district,
+            address: formState.address,
+            transactionId: transaction?.id
+          };
 
-        if (editingId) {
-          onUpdateOrders(orders.map(o => o.id === editingId ? newOrder : o));
-          
-          if (shouldCreateTransaction) {
-            const txExists = ledgerTransactions.some(t => t.id === `tx-ord-${editingId}`);
-            if (txExists) {
-              onUpdateTransactions(ledgerTransactions.map(t => t.id === `tx-ord-${editingId}` ? transaction : t));
+          if (editingId) {
+            onUpdateOrders(orders.map(o => o.id === editingId ? newOrder : o));
+            if (transaction) {
+              onUpdateTransactions([transaction, ...ledgerTransactions.filter(t => t.id !== transaction.id)]);
             } else {
-              onUpdateTransactions([transaction, ...ledgerTransactions]);
+              onUpdateTransactions(ledgerTransactions.filter(t => t.id !== `tx-ord-${editingId}`));
             }
           } else {
-            onUpdateTransactions(ledgerTransactions.filter(t => t.id !== `tx-ord-${editingId}`));
-          }
-          
-          if (selectedCustomer) {
-            onAddCardLog?.(selectedCustomer.name, `Cập nhật đơn hàng #${orderId.slice(-6).toUpperCase()}: ${totalAmountAfterDiscount.toLocaleString('vi-VN')}đ`);
+            onUpdateOrders([newOrder, ...orders]);
+            if (transaction) onUpdateTransactions([transaction, ...ledgerTransactions]);
           }
         } else {
-          onUpdateOrders([newOrder, ...orders]);
-          if (transaction) {
-            onUpdateTransactions([transaction, ...ledgerTransactions]);
-          }
-          
-          if (selectedCustomer) {
-            onAddCardLog?.(selectedCustomer.name, `Tạo đơn hàng mới #${orderId.slice(-6).toUpperCase()}: ${totalAmountAfterDiscount.toLocaleString('vi-VN')}đ`);
+          const newImport: ImportOrder = {
+            id: orderId,
+            supplierId: formState.supplierId,
+            items: validItems.map(i => ({ productId: i.productId, quantity: i.quantity, importPrice: i.unitPrice, subtotal: i.subtotal })),
+            totalAmount: total,
+            date,
+            createdAt: Date.now(),
+            transactionId: transaction?.id
+          };
+          if (editingId) {
+            onUpdateImportOrders(importOrders.map(o => o.id === editingId ? newImport : o));
+            if (transaction) onUpdateTransactions([transaction, ...ledgerTransactions.filter(t => t.id !== transaction.id)]);
+          } else {
+            onUpdateImportOrders([newImport, ...importOrders]);
+            if (transaction) onUpdateTransactions([transaction, ...ledgerTransactions]);
           }
         }
 
@@ -298,6 +367,7 @@ export default function OrderManagementModal({
         setCustomerSearch("");
         setFormState({
           customerId: "",
+          supplierId: "",
           items: [{ productId: "", quantity: 1, unitPrice: 0, discount: 0, subtotal: 0, discountType: 'amount', discountValue: 0 }],
           city: "",
           district: "",
@@ -308,10 +378,11 @@ export default function OrderManagementModal({
   };
 
   const handleEdit = (order: Order) => {
-    const cust = customers.find(c => c.id === order.customerId);
+    const cust = customers?.find(c => c.id === order.customerId);
     setFormState({
       customerId: order.customerId,
-      items: [...order.items.map(i => ({ ...i, discountType: 'amount' as const, discountValue: i.discount })), { productId: "", quantity: 1, unitPrice: 0, discount: 0, subtotal: 0, discountType: 'amount', discountValue: 0 }],
+      supplierId: "",
+      items: [...order.items.map(i => ({ ...i, discountType: 'amount' as const, discountValue: i.discount })), { productId: "", quantity: 1, unitPrice: 0, discount: 0, subtotal: 0, discountType: 'amount' as const, discountValue: 0 }],
       city: order.city || "",
       district: order.district || "",
       address: order.address || ""
@@ -321,12 +392,17 @@ export default function OrderManagementModal({
     setShowForm(true);
   };
 
-  const handleDelete = (orderId: string) => {
-    setConfirmConfig({
-      message: "Bạn có chắc chắn muốn xóa đơn hàng này? Phiếu chi tương ứng cũng sẽ bị xóa.",
-      action: () => {
+  const handleDelete = (orderId: string, isImport: boolean = false) => {
+    requirePin(`Bạn có chắc chắn muốn xóa ${isImport ? 'phiếu nhập' : 'đơn hàng'} này?`, () => {
+      if (isImport) {
+        onUpdateImportOrders(importOrders.filter(o => o.id !== orderId));
+        onUpdateTransactions(ledgerTransactions.filter(t => t.id !== `tx-imp-${orderId}`));
+      } else {
+        const order = orders.find(o => o.id === orderId);
+        const customer = customers.find(c => c.id === order?.customerId);
         onUpdateOrders(orders.filter(o => o.id !== orderId));
         onUpdateTransactions(ledgerTransactions.filter(t => t.id !== `tx-ord-${orderId}`));
+        if (customer) onAddCardLog?.(customer.name, `Xóa đơn hàng ${orderId}`);
       }
     });
   };
@@ -357,11 +433,26 @@ export default function OrderManagementModal({
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-800 leading-tight">Đơn hàng</h2>
-              <p className="text-[9px] font-bold text-sky-500 uppercase tracking-wider">Quản lý bán hàng</p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
+            <div className="flex bg-slate-100 p-1 rounded-xl">
+              <button 
+                onClick={() => setActiveTab('sales')}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-black transition-all",
+                  activeTab === 'sales' ? "bg-white text-sky-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                )}
+              >Bán hàng</button>
+              <button 
+                onClick={() => setActiveTab('import')}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-black transition-all",
+                  activeTab === 'import' ? "bg-white text-amber-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                )}
+              >Nhập hàng</button>
+            </div>
           </div>
       </div>
 
@@ -371,10 +462,13 @@ export default function OrderManagementModal({
           {!showForm && (
             <div className="flex gap-3">
               <button 
-                onClick={() => setShowForm(true)}
-                className="flex-1 bg-sky-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-sky-100 active:scale-95 transition-all flex items-center justify-center gap-2 border border-sky-700/10"
+                onClick={() => { setShowForm(true); setEditingId(null); }}
+                className={cn(
+                  "flex-1 py-4 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 border",
+                  activeTab === 'sales' ? "bg-sky-600 text-white shadow-sky-100 border-sky-700/10" : "bg-amber-600 text-white shadow-amber-100 border-amber-700/10"
+                )}
               >
-                <Plus className="w-5 h-5 stroke-[3]" /> TẠO ĐƠN HÀNG MỚI
+                <Plus className="w-5 h-5 stroke-[3]" /> TẠO {activeTab === 'sales' ? 'ĐƠN HÀNG' : 'PHIẾU NHẬP'} MỚI
               </button>
             </div>
           )}
@@ -383,16 +477,17 @@ export default function OrderManagementModal({
           <div className="flex-1 bg-white border border-pastel-border rounded-[40px] overflow-hidden flex flex-col shadow-sm">
             <div className="hidden lg:flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0 items-center">
               <div className="w-10 text-center">STT</div>
-              <div className="w-56 px-4">Khách hàng</div>
-              <div className="flex-1">Sản phẩm</div>
-              <div className="w-28 text-right text-rose-500">Công nợ KH</div>
+              <div className="w-24 text-center">Ngày</div>
+              <div className="w-48 px-4">{activeTab === 'sales' ? 'Khách hàng' : 'Nhà cung cấp'}</div>
+              <div className="flex-1">Danh sách</div>
               <div className="w-28 text-right text-sky-600">Tổng tiền</div>
+              <div className="w-28 text-right text-rose-500">Công nợ</div>
               <div className="w-24 text-right pr-4">Thao tác</div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
-              {paginatedOrders.map((order, idx) => {
-                const customer = customers.find(c => c.id === order.customerId);
+              {activeTab === 'sales' ? paginatedOrders.map((order, idx) => {
+                const customer = customers?.find(c => c.id === order.customerId);
                 const debt = getCustomerBalance(order.customerId);
                 
                 return (
@@ -401,36 +496,32 @@ export default function OrderManagementModal({
                       <span className="text-xs font-black text-pastel-subtext w-10 text-center lg:block hidden mt-2">
                         {(currentPage - 1) * pageSize + idx + 1}
                       </span>
-                      <div className="flex items-center gap-3 px-0 lg:px-2 w-56">
+                      <div className="w-24 text-center lg:block hidden mt-2">
+                         <span className="text-[10px] font-bold text-pastel-subtext">{formatIsoToPretty(order.date)}</span>
+                      </div>
+                      <div className="flex items-center gap-3 px-0 lg:px-2 w-48">
                         <div className="w-10 h-10 rounded-xl bg-pastel-bg flex items-center justify-center overflow-hidden border border-pastel-border shrink-0">
                           {customer?.imageUrl ? <img src={customer.imageUrl} className="w-full h-full object-cover" /> : <UserPlus className="w-5 h-5 text-pastel-subtext/20" />}
                         </div>
                         <div className="min-w-0 flex-1">
                           <span className="block font-black text-[13px] text-slate-700 truncate">{customer?.name || "N/A"}</span>
-                          <span className="block text-[9px] text-pastel-subtext font-bold uppercase truncate">
-                            {order.address ? `${order.address}, ${order.district}` : "Chưa có địa chỉ"}
-                          </span>
                         </div>
-                      </div>
-                      <div className="lg:hidden font-black text-sm text-slate-800">
-                        {order.totalAmount.toLocaleString()}đ
                       </div>
                     </div>
 
                     <div className="flex-1 min-w-0 flex flex-col space-y-1 lg:ml-0 ml-14">
                       {order.items.map((item, i) => {
-                        const p = products.find(prod => prod.id === item.productId);
-                        const mfg = item.mfgDate ? `NSX: ${item.mfgDate.split('-').reverse().join('/')}` : '';
-                        const exp = item.expDate ? `HSD: ${item.expDate.split('-').reverse().join('/')}` : '';
-                        const dates = [mfg, exp].filter(Boolean).join(' - ');
+                        const p = products?.find(prod => prod.id === item.productId);
                         return (
-                          <div key={i} className="text-[11px] font-bold text-slate-700 whitespace-nowrap overflow-hidden text-ellipsis flex flex-wrap gap-1 items-center">
-                            <span className="text-sky-500 font-black">{item.quantity} x {item.unitPrice.toLocaleString('vi-VN')}</span>
-                            <span className="text-slate-600">{p?.name || 'Sản phẩm ' + item.productId}</span>
-                            {dates && <span className="text-pastel-subtext text-[9px]">({dates})</span>}
+                          <div key={i} className="text-[11px] font-bold text-slate-700 whitespace-nowrap overflow-hidden text-ellipsis flex flex-wrap gap-1 items-center border-b border-sky-50 last:border-0 py-1">
+                            <span className="text-sky-500 font-black">{item.quantity} x {p?.name || 'Sản phẩm ' + item.productId}</span>
                           </div>
                         );
                       })}
+                    </div>
+
+                    <div className="w-28 text-right shrink-0 hidden lg:block mt-1">
+                      <span className="block font-black text-sm text-sky-600">{order.totalAmount.toLocaleString()}đ</span>
                     </div>
 
                     <div className="w-28 text-right shrink-0 hidden lg:block mt-1">
@@ -440,29 +531,71 @@ export default function OrderManagementModal({
                       )}>{debt.toLocaleString('vi-VN')}đ</span>
                     </div>
 
-                    <div className="w-28 text-right shrink-0 hidden lg:block mt-1">
-                      <span className="block font-black text-sm text-sky-600">{order.totalAmount.toLocaleString()}đ</span>
-                      <span className="block text-[9px] font-bold text-pastel-subtext">{formatIsoToPretty(order.date)}</span>
-                    </div>
-
                     <div className="flex items-center gap-1.5 shrink-0 justify-end w-full lg:w-24 mt-2 lg:mt-0">
                       <span className="lg:hidden text-[9px] font-bold text-pastel-subtext mr-auto">{formatIsoToPretty(order.date)}</span>
                       <button 
                         onClick={() => handleEdit(order)}
-                        className="p-2.5 text-sky-500 bg-white border border-sky-100 rounded-xl shadow-sm hover:bg-sky-50 active:scale-90 transition-all"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                        className="p-2.5 text-sky-500 bg-white border border-sky-100 rounded-xl shadow-sm hover:bg-sky-50 active:scale-90 transition-all font-bold text-[10px]"
+                      >Sửa</button>
                       <button 
                         onClick={() => handleDelete(order.id)}
-                        className="p-2.5 text-rose-500 bg-white border border-rose-100 rounded-xl shadow-sm hover:bg-rose-50 active:scale-90 transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        className="p-2.5 text-rose-500 bg-white border border-rose-100 rounded-xl shadow-sm hover:bg-rose-50 active:scale-90 transition-all font-bold text-[10px]"
+                      >Xóa</button>
                     </div>
                   </div>
                 );
-              })}
+              }) : (
+                importOrders.map((order, idx) => {
+                  const sup = suppliers?.find(s => s.id === order.supplierId);
+                  return (
+                    <div key={idx} className="flex flex-col lg:flex-row lg:items-start gap-4 p-4 hover:bg-amber-50/20 border-b border-pastel-border/30 last:border-0 transition-colors">
+                       <span className="text-xs font-black text-pastel-subtext w-10 text-center lg:block hidden mt-2">
+                        {(currentPage - 1) * pageSize + idx + 1}
+                      </span>
+                      <div className="w-24 text-center lg:block hidden mt-2">
+                         <span className="text-[10px] font-bold text-pastel-subtext">{formatIsoToPretty(order.date)}</span>
+                      </div>
+                      <div className="flex items-center gap-3 px-0 lg:px-2 w-48 font-black text-slate-700">
+                         {sup?.name || "N/A"}
+                      </div>
+                      <div className="flex-1 min-w-0 flex flex-col space-y-1 lg:ml-0 ml-14">
+                        {order.items.map((item, i) => {
+                          const p = products?.find(prod => prod.id === item.productId);
+                          return (
+                            <div key={i} className="text-[11px] font-bold text-slate-700 whitespace-nowrap overflow-hidden text-ellipsis flex flex-wrap gap-1 items-center border-b border-amber-50 last:border-0 py-1">
+                              <span className="text-amber-500 font-black">{item.quantity} x {p?.name || 'Sản phẩm ' + item.productId}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="w-28 text-right mt-1 shrink-0">
+                         <span className="block font-black text-sm text-amber-600">{order.totalAmount.toLocaleString()}đ</span>
+                      </div>
+                      <div className="w-28"></div>
+                      <div className="flex items-center gap-1.5 shrink-0 justify-end w-full lg:w-24 mt-2 lg:mt-0">
+                        <button 
+                          onClick={() => {
+                             setActiveTab('import');
+                             setFormState({
+                                supplierId: order.supplierId,
+                                customerId: "",
+                                items: [...order.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.importPrice, discount: 0, subtotal: i.subtotal, discountType: 'amount' as const, discountValue: 0 })), { productId: "", quantity: 1, unitPrice: 0, discount: 0, subtotal: 0, discountType: 'amount', discountValue: 0 }],
+                                city: "", district: "", address: ""
+                             });
+                             setEditingId(order.id);
+                             setShowForm(true);
+                          }}
+                          className="p-2.5 text-amber-500 bg-white border border-amber-100 rounded-xl shadow-sm hover:bg-amber-50 active:scale-90 transition-all font-bold text-[10px]"
+                        >Sửa</button>
+                        <button 
+                          onClick={() => handleDelete(order.id, true)}
+                          className="p-2.5 text-rose-500 bg-white border border-rose-100 rounded-xl shadow-sm hover:bg-rose-50 active:scale-90 transition-all font-bold text-[10px]"
+                        >Xóa</button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
               {orders.length === 0 && (
                 <div className="h-60 flex flex-col items-center justify-center text-pastel-subtext italic text-sm gap-2">
                   <ShoppingCart className="w-10 h-10 opacity-20" />
@@ -625,47 +758,8 @@ export default function OrderManagementModal({
                       </div>
                     </div>
 
-                    {/* Right Section: Totals & Summary */}
-                    <div className="flex flex-col gap-6">
-                      <div className="p-8 bg-sky-600 rounded-[40px] text-white shadow-2xl shadow-sky-200 relative overflow-hidden flex-1">
-                        <div className="absolute top-0 right-0 p-8 opacity-10">
-                          <ShoppingCart className="w-32 h-32" />
-                        </div>
-                        
-                        <div className="relative z-10 flex flex-col h-full">
-                          <div className="mb-auto">
-                            <span className="text-sky-100 text-[10px] font-black uppercase tracking-[0.3em]">Hóa đơn dự kiến</span>
-                            <h5 className="text-3xl font-black mt-2 mb-8">
-                              {totalAmountAfterDiscount.toLocaleString('vi-VN')} <span className="text-lg">đ</span>
-                            </h5>
-                            
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-center text-sm font-bold border-b border-sky-400 pb-2">
-                                <span className="text-sky-100">Tổng SL sản phẩm:</span>
-                                <span>{formState.items.filter(i => i.productId).reduce((sum, i) => sum + i.quantity, 0)}</span>
-                              </div>
-                              <div className="flex justify-between items-center text-sm font-bold border-b border-sky-400 pb-2">
-                                <span className="text-sky-100">Khách:</span>
-                                <span className="max-w-[150px] truncate">{selectedCustomer?.name || "Chưa chọn"}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <button 
-                            onClick={handleSave}
-                            disabled={!formState.customerId || formState.items.filter(i => i.productId).length === 0}
-                            className={cn(
-                              "w-full py-5 rounded-[24px] font-black text-lg transition-all active:scale-95 shadow-2xl flex items-center justify-center gap-3 mt-8",
-                              !formState.customerId || formState.items.filter(i => i.productId).length === 0
-                                ? "bg-sky-700/50 text-sky-400 cursor-not-allowed"
-                                : "bg-white text-sky-600 hover:shadow-sky-800/20"
-                            )}
-                          >
-                            <Save className="w-6 h-6" /> {editingId ? "CẬP NHẬT ĐƠN" : "XÁC NHẬN TẠO ĐƠN"}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Right Section: Empty or other info if needed, or just let items take full width */}
+                    <div className="hidden lg:block" />
                   </div>
 
                   {/* Items List - Full Width Below Info */}
@@ -689,15 +783,51 @@ export default function OrderManagementModal({
                             <div className="flex-1 min-w-0">
                               <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Sản phẩm</label>
                               <div className="relative">
-                                <select 
-                                  value={item.productId}
-                                  onChange={(e) => handleItemChange(index, { productId: e.target.value })}
-                                  className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-2.5 md:p-3 text-xs font-bold outline-none focus:border-sky-300 appearance-none truncate pr-8"
-                                >
-                                  <option value="">-- Chọn sản phẩm --</option>
-                                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                </select>
-                                <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-subtext pointer-events-none rotate-90" />
+                                <div className="flex gap-2">
+                                  <input 
+                                    type="text"
+                                    placeholder="Tìm sản phẩm..."
+                                    value={productSearchIndex === index ? productSearch : (products.find(p => p.id === item.productId)?.name || "")}
+                                    onChange={(e) => {
+                                      setProductSearch(e.target.value);
+                                      setProductSearchIndex(index);
+                                      if (!e.target.value) handleItemChange(index, { productId: "" });
+                                    }}
+                                    onFocus={() => {
+                                      setProductSearchIndex(index);
+                                      setProductSearch("");
+                                    }}
+                                    className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-2.5 md:p-3 text-xs font-bold outline-none focus:border-sky-300"
+                                  />
+                                </div>
+                                
+                                <AnimatePresence>
+                                  {productSearchIndex === index && productSuggestions.length > 0 && (
+                                    <motion.div 
+                                      initial={{ opacity: 0, y: -10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -10 }}
+                                      className="absolute top-full left-0 right-0 mt-2 bg-white border border-pastel-border rounded-xl shadow-xl z-[60] overflow-hidden max-h-48 overflow-y-auto no-scrollbar"
+                                    >
+                                      {productSuggestions.map(p => (
+                                        <button
+                                          key={p.id}
+                                          onClick={() => {
+                                            handleItemChange(index, { productId: p.id });
+                                            setProductSearch("");
+                                            setProductSearchIndex(null);
+                                          }}
+                                          className="w-full px-4 py-3 text-left hover:bg-sky-50 flex flex-col transition-colors border-b border-pastel-border/30 last:border-0"
+                                        >
+                                          <span className="text-xs font-bold text-slate-700">{p.name}</span>
+                                          <span className="text-[10px] text-pastel-subtext">
+                                            {brands.find(b => b.id === p.brandId)?.name} - {((activeTab === 'sales' ? (p.price || p.details?.sellingPrice || 0) : (p.details?.importPrice || 0))).toLocaleString()}đ
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
                               </div>
                               
                               {/* MFG / EXP Dates */}
@@ -732,7 +862,7 @@ export default function OrderManagementModal({
 
                           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 items-end">
                             <div>
-                              <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Đơn giá</label>
+                              <label className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest mb-1.5 ml-1 block">Giá bán</label>
                               <div className="relative">
                                 <input 
                                   type="text"
@@ -802,6 +932,46 @@ export default function OrderManagementModal({
                       ))}
                     </div>
                   </div>
+
+                  {/* Summary Footer */}
+                  <div className="mt-12 border-t border-pastel-border pt-6 bg-white sticky bottom-0 z-40 pb-6 -mx-6 px-6">
+                    <div className="max-w-3xl mx-auto flex flex-col md:flex-row items-center gap-6">
+                        {/* Flat Summary Style */}
+                        <div className="flex-1 w-full grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4 bg-pastel-bg rounded-2xl border border-pastel-border shadow-inner">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest leading-none mb-1">Số lượng</span>
+                            <span className="text-sm font-black text-slate-700">{totals.qty} SP</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-pastel-subtext uppercase tracking-widest leading-none mb-1">Tổng tiền</span>
+                            <span className="text-sm font-black text-slate-700">{totals.totalBeforeDiscount.toLocaleString('vi-VN')} đ</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest leading-none mb-1">Ưu đãi</span>
+                            <span className="text-sm font-black text-rose-500">-{totals.totalDiscount.toLocaleString('vi-VN')} đ</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-sky-500 uppercase tracking-widest leading-none mb-1">Cần thanh toán</span>
+                            <span className="text-base font-black text-sky-600">{totals.totalAfterDiscount.toLocaleString('vi-VN')} đ</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 md:w-80 w-full shrink-0">
+                          <button 
+                            onClick={handleSave}
+                            disabled={!formState.customerId || formState.items.filter(i => i.productId).length === 0}
+                            className={cn(
+                              "flex-1 md:h-16 py-4 rounded-2xl font-black text-sm transition-all active:scale-95 shadow-xl flex items-center justify-center gap-3 border-b-4",
+                              !formState.customerId || formState.items.filter(i => i.productId).length === 0
+                                ? "bg-slate-200 text-slate-400 border-slate-300 cursor-not-allowed"
+                                : "bg-sky-600 text-white hover:bg-sky-700 shadow-sky-100 border-sky-800"
+                            )}
+                          >
+                            <Save className="w-5 h-5" /> {editingId ? "CẬP NHẬT" : "TẠO ĐƠN"}
+                          </button>
+                        </div>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -838,6 +1008,50 @@ export default function OrderManagementModal({
             onConfirm={confirmConfig.action}
             onCancel={() => setConfirmConfig(null)}
           />
+        )}
+
+        {pinInput && (
+          <motion.div className="absolute inset-0 flex items-center justify-center bg-black/80 z-[2200] p-4 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1, x: pinError ? [0, -10, 10, -5, 5, 0] : 0 }} 
+              className="bg-white w-full max-w-sm rounded-[40px] p-8 shadow-2xl text-center relative"
+            >
+              <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <AlertCircle className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Xác minh bảo mật</h3>
+              <p className="text-sm font-medium text-pastel-subtext mb-6">{pinInput.message}</p>
+              <div className="space-y-3 mb-6">
+                <input 
+                  type="password"
+                  value={pinValue}
+                  onChange={(e) => setPinValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handlePinConfirm()}
+                  className={cn(
+                    "w-full bg-pastel-bg border-4 rounded-2xl p-4 text-center text-sm font-black outline-none transition-all",
+                    pinError ? "border-red-500" : "border-pastel-border focus:border-rose-400"
+                  )}
+                  placeholder="Nhập mật khẩu"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { setPinInput(null); setPinValue(""); setPinError(false); }} 
+                  className="flex-1 py-4 font-bold text-slate-400 bg-slate-50 rounded-2xl active:scale-95"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={handlePinConfirm}
+                  className="flex-1 py-4 font-black text-white bg-slate-800 rounded-2xl shadow-lg active:scale-95 transition-all"
+                >
+                  Xác nhận
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </motion.div>
   );

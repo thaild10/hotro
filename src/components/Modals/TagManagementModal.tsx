@@ -131,10 +131,10 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {tags.length > 0 ? tags.map(t => {
+                {tags.length > 0 ? tags.map((t, idx) => {
                   const colors = getTagColors(t.text);
                   return (
-                    <span key={t.text} className={cn("px-3 py-1.5 rounded-full text-[10px] font-black border shadow-sm transition-all", colors.bg, colors.text, colors.border)}>
+                    <span key={`${t.text}-${idx}`} className={cn("px-3 py-1.5 rounded-full text-[10px] font-black border shadow-sm transition-all", colors.bg, colors.text, colors.border)}>
                       {t.text}
                     </span>
                   );
@@ -178,12 +178,12 @@ export default function TagManagementModal({ tagsConfig, onClose, onUpdateConfig
               </div>
               <div className="flex-1 overflow-y-auto no-scrollbar">
                 <div className="flex flex-wrap gap-2 py-2">
-                  {allAvailableTags.map(tagText => {
+                  {allAvailableTags.map((tagText, idx) => {
                     const isActive = (tagsConfig[editingTabId!] || []).some(t => t.text === tagText);
                     const colors = getTagColors(tagText);
                     return (
                       <button 
-                        key={tagText}
+                        key={`${tagText}-${idx}`}
                         onClick={() => handleToggleTagInTab(editingTabId!, tagText)}
                         onContextMenu={(e) => { e.preventDefault(); handleDeleteTagGlobal(tagText); }}
                         className={cn(

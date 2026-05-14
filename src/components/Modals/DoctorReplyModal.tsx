@@ -5,12 +5,16 @@ import { motion } from "motion/react";
 
 interface DoctorReplyModalProps {
   card: KanbanCard;
+  editingIndex?: number | null;
   onClose: () => void;
   onSave: (reply: string) => void;
 }
 
-export default function DoctorReplyModal({ card, onClose, onSave }: DoctorReplyModalProps) {
+export default function DoctorReplyModal({ card, editingIndex, onClose, onSave }: DoctorReplyModalProps) {
   const [reply, setReply] = useState(() => {
+    if (editingIndex !== null && editingIndex !== undefined && card.doctorReplies && card.doctorReplies[editingIndex]) {
+      return card.doctorReplies[editingIndex].text;
+    }
     if (card.replyAgain) return "";
     if (card.doctorReplies && card.doctorReplies.length > 0) {
       return card.doctorReplies[card.doctorReplies.length - 1].text;

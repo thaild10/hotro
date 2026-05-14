@@ -29,15 +29,18 @@ export default function CardHistoryModal({ card, onClose }: CardHistoryModalProp
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar py-2">
-          {card.logs.length > 0 ? card.logs.map((log, i) => (
-            <div key={i} className="p-3 bg-pastel-bg rounded-2xl border border-pastel-border/50 text-[11px] font-medium leading-relaxed">
-              {log}
-            </div>
-          )) : (
-            <div className="text-center italic text-pastel-subtext text-[11px] py-10">
-              Chưa có lịch sử
-            </div>
-          )}
+          {(() => {
+            const movementLogs = card.logs.filter(log => log.includes("Chuyển sang") || log.includes("Tạo thẻ mới"));
+            return movementLogs.length > 0 ? movementLogs.map((log, i) => (
+              <div key={i} className="p-3 bg-pastel-bg rounded-2xl border border-pastel-border/50 text-[11px] font-medium leading-relaxed">
+                {log}
+              </div>
+            )) : (
+              <div className="text-center italic text-pastel-subtext text-[11px] py-10">
+                Chưa có lịch sử chuyển thẻ
+              </div>
+            );
+          })()}
         </div>
       </motion.div>
     </div>

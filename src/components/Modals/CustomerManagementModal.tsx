@@ -64,6 +64,7 @@ export default function CustomerManagementModal({
   const [initialDebtStr, setInitialDebtStr] = useState("0");
   const [isUploading, setIsUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formState, setFormState] = useState({ phone: "" });
   const [showGroupManagement, setShowGroupManagement] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -75,6 +76,13 @@ export default function CustomerManagementModal({
   const [pageSize, setPageSize] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
   const [skinIssueDropdownFor, setSkinIssueDropdownFor] = useState<string | null>(null);
+  const [inlineEditingAudit, setInlineEditingAudit] = useState<{
+    customerId: string,
+    month: string,
+    type: 'Khám' | 'Kiểm tra',
+    id?: string
+  } | null>(null);
+  const [inlineDateValue, setInlineDateValue] = useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const getCustomerBalance = (customerId: string) => {
@@ -106,19 +114,20 @@ export default function CustomerManagementModal({
   const last3Months = useMemo(() => {
     const now = new Date();
     const months = [];
-    for (let i = 0; i < 3; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    // Show [now-1, now, now+1]
+    for (let i = -1; i <= 1; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const m = d.getMonth() + 1;
       const y = d.getFullYear();
       months.push({
-        label: `T${m}/${y}`,
+        label: `T${m}`,
         value: `${y}-${m.toString().padStart(2, '0')}`
       });
     }
-    return months.reverse(); // Current month is last
+    return months;
   }, []);
 
-  const handleToggleSkinAudit = (customerId: string, month: string, type: 'Khám' | 'Kiểm tra') => {
+  const handleToggleSkinAudit = (customerId: string, month: string, type: 'Khám' | 'Kiểm tra', manualDate?: string) => {
     const existing = skinAudits.find(e => e.customerId === customerId && e.month === month && e.type === type);
     
     if (existing) {
@@ -137,12 +146,18 @@ export default function CustomerManagementModal({
       onUpdateSkinAuditLogs([newLog, ...skinAuditLogs]);
     } else {
       // Create
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      const todayFormatted = `${dd}.${mm}.${yyyy}`;
+
       const newEntry: SkinAuditEntry = {
         id: `audit-${Date.now()}`,
         customerId,
         month,
         type,
-        date: new Date().toLocaleDateString('vi-VN'),
+        date: manualDate || todayFormatted,
         createdBy: username,
         createdAt: new Date().toLocaleString('vi-VN')
       };
@@ -201,62 +216,26 @@ export default function CustomerManagementModal({
     const targetBalance = parseFloat(initialDebtStr.replace(/\./g, "").replace(/,/g, "")) || 0;
 
     if (editingId) {
-      const existingCustomer = customers.find(c => c.id === editingId);
-      const currentBalance = getCustomerBalance(editingId);
-      
-      const diff = targetBalance - currentBalance;
-      const newInitialDebt = (existingCustomer?.initialDebt || 0) + diff;
-      
       const updated = customers.map(c => 
         c.id === editingId ? { 
           ...c, 
           name: name.trim(), 
+          phone: (formState as any).phone?.trim() || c.phone,
           imageUrl, 
           groupId: selectedGroupId || undefined, 
           city: city.trim() || undefined, 
           district: district.trim() || undefined, 
           address: address.trim() || undefined,
-          initialDebt: newInitialDebt
+          initialDebt: targetBalance - (transactions.filter(t => t.customerId === editingId).reduce((sum, t) => sum + (t.type === 'Chi' ? t.amount : -t.amount), 0))
         } : c
       );
       onUpdateCustomers(updated);
-
-      // If balance changed, log transaction
-      if (diff !== 0) {
-        const purpose = ledgerPurposes.find(p => p.name === 'Điều chỉnh' || p.name === 'Khách');
-        const account = ledgerAccounts[0];
-        
-        if (purpose && account) {
-          const newTx: LedgerTransaction = {
-            id: `tx-adj-${Date.now()}`,
-            accountId: account.id,
-            purposeId: purpose.id,
-            amount: Math.abs(diff),
-            date: getTodayIso(),
-            reason: `Điều chỉnh số dư KH ${name.trim()}`,
-            type: diff > 0 ? 'Chi' : 'Thu', // If balance increased, record as 'Chi' or negative payment
-            createdAt: Date.now(),
-            customerId: editingId
-          };
-          onUpdateTransactions([newTx, ...transactions]);
-
-          const newLog: LedgerLog = {
-            id: `log-adj-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            user: username,
-            action: "Sửa",
-            targetType: "Giao dịch",
-            message: `Sửa số dư: ${currentBalance.toLocaleString('vi-VN')} -> ${targetBalance.toLocaleString('vi-VN')}`
-          };
-          onUpdateLogs([newLog]);
-        }
-      }
-
       setEditingId(null);
     } else {
       const newCustomer: Customer = {
         id: `cust-${Date.now()}`,
         name: name.trim(),
+        phone: (formState as any).phone?.trim(),
         imageUrl,
         groupId: selectedGroupId || undefined,
         city: city.trim() || undefined,
@@ -274,10 +253,12 @@ export default function CustomerManagementModal({
     setDistrict("");
     setAddress("");
     setInitialDebtStr("0");
+    setFormState({ phone: "" });
   };
 
   const handleEdit = (customer: Customer) => {
     setName(customer.name);
+    setFormState({ phone: customer.phone || "" });
     setImageUrl(customer.imageUrl || "");
     setSelectedGroupId(customer.groupId || "");
     setCity(customer.city || "");
@@ -363,8 +344,15 @@ export default function CustomerManagementModal({
     });
   };
 
+  const [showAuditHistoryCustId, setShowAuditHistoryCustId] = useState<string | null>(null);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
+
+  const getAuditLogsForCustomer = (customerId: string) => {
+    return skinAuditLogs
+      .filter(log => log.customerId === customerId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  };
 
   const handleDelete = (id: string) => {
     setConfirmConfig({
@@ -455,7 +443,6 @@ export default function CustomerManagementModal({
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-800 leading-tight">Khách hàng</h2>
-              <p className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">Danh sách & Thông tin</p>
             </div>
           </div>
         </div>
@@ -474,9 +461,40 @@ export default function CustomerManagementModal({
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Tìm kiếm khách hàng theo tên, địa chỉ..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                placeholder="Tìm kiếm khách hàng theo tên, địa chỉ (gõ 3 ký tự)..."
                 className="w-full bg-pastel-bg border border-pastel-border rounded-2xl py-4 pl-12 pr-4 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-500/5 transition-all"
               />
+              {searchQuery.length >= 3 && (customers.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).length > 0) && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-rose-100 rounded-2xl shadow-xl z-50 overflow-hidden max-h-60 overflow-y-auto no-scrollbar">
+                  {customers
+                    .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .slice(0, 5)
+                    .map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setSearchQuery(c.name);
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-rose-50 transition-colors flex items-center gap-3 border-b border-rose-50 last:border-0"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center shrink-0 overflow-hidden">
+                          {c.imageUrl ? <img src={c.imageUrl} className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-rose-400" />}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">{c.name}</div>
+                          <div className="text-[10px] text-pastel-subtext">{c.phone || "Không có SĐT"}</div>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
               <button 
@@ -556,13 +574,22 @@ export default function CustomerManagementModal({
                 <div className="flex flex-col md:flex-row gap-3">
                   <div className="flex-1">
                     <label className="text-[10px] font-black text-pastel-subtext uppercase tracking-widest ml-1 mb-1 block">Tên khách hàng</label>
+                    <div className="flex gap-2">
                     <input 
                       type="text" 
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Họ và tên khách hàng..."
-                      className="w-full bg-white border border-rose-100 rounded-xl px-4 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-500/5 transition-all shadow-sm"
+                      placeholder="Họ và tên..."
+                      className="flex-1 bg-white border border-rose-100 rounded-xl px-4 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-500/5 transition-all shadow-sm"
                     />
+                    <input 
+                      type="text" 
+                      value={formState.phone}
+                      onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
+                      placeholder="Số điện thoại..."
+                      className="w-32 bg-white border border-rose-100 rounded-xl px-4 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-rose-500/5 transition-all shadow-sm"
+                    />
+                    </div>
                   </div>
                   <div className="w-full md:w-48">
                     <label className="text-[10px] font-black text-pastel-subtext uppercase tracking-widest ml-1 mb-1 block">Nhóm</label>
@@ -638,6 +665,7 @@ export default function CustomerManagementModal({
           <div className="flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0 items-center">
             <div className="w-10 text-center">STT</div>
             <div className="flex-1">Khách hàng</div>
+            <div className="w-24 text-center">Thông tin da</div>
             <div className="hidden md:flex w-48 justify-center gap-1">
               {last3Months.map(m => (
                 <div key={m.value} className="w-14 text-center text-[8px]">{m.label}</div>
@@ -667,7 +695,10 @@ export default function CustomerManagementModal({
                   </div>
                   
                   <div className="flex-1 min-w-0 relative">
-                    <span className="block font-black text-sm text-slate-700 truncate">{customer.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-sm text-slate-700 truncate">{customer.name}</span>
+                      {customer.phone && <span className="text-sm font-bold text-rose-500">{customer.phone}</span>}
+                    </div>
                     <div className="flex flex-col gap-0.5">
                       {(customer.address || customer.district || customer.city) && (
                         <span className="block w-full text-[9px] text-slate-500 truncate leading-tight">
@@ -723,34 +754,229 @@ export default function CustomerManagementModal({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-pastel-border/30 pt-3 md:pt-0">
+                <div className="flex items-center justify-between md:justify-end gap-1.5 border-t md:border-t-0 border-pastel-border/30 pt-3 md:pt-0">
                   {/* Skin Check - last 3 months */}
-                  <div className="flex gap-1">
-                    {last3Months.map(month => {
+                  <div className="flex gap-1 shrink-0 overflow-x-auto no-scrollbar py-1">
+                    {last3Months.map((month) => {
                       const exam = skinAudits.find(e => e.customerId === customer.id && e.month === month.value && e.type === 'Khám');
                       const check = skinAudits.find(e => e.customerId === customer.id && e.month === month.value && e.type === 'Kiểm tra');
+                      
                       return (
-                        <div key={month.value} className="flex flex-col gap-0.5">
-                          <button 
-                            onClick={() => handleToggleSkinAudit(customer.id, month.value, 'Khám')}
-                            className={cn(
-                              "w-7 h-5 rounded-[4px] flex items-center justify-center transition-all",
-                              exam ? "bg-rose-500 text-white shadow-sm" : "bg-pastel-bg border border-pastel-border/50 text-pastel-subtext/30"
-                            )}
-                            title={`Khám ${month.label}`}
-                          >
-                            <Stethoscope className="w-3 h-3" />
-                          </button>
-                          <button 
-                            onClick={() => handleToggleSkinAudit(customer.id, month.value, 'Kiểm tra')}
-                            className={cn(
-                              "w-7 h-5 rounded-[4px] flex items-center justify-center transition-all",
-                              check ? "bg-emerald-500 text-white shadow-sm" : "bg-pastel-bg border border-pastel-border/50 text-pastel-subtext/30"
-                            )}
-                            title={`Kiểm tra ${month.label}`}
-                          >
-                            <CheckCircle2 className="w-3 h-3" />
-                          </button>
+                        <div key={month.value} className="flex flex-col gap-1 items-center w-14 shrink-0">
+                          {/* Khám Logic */}
+                          {inlineEditingAudit?.customerId === customer.id && 
+                           inlineEditingAudit.month === month.value && 
+                           inlineEditingAudit.type === 'Khám' ? (
+                            <div className="w-full flex flex-col gap-1">
+                              <input 
+                                type="text"
+                                value={inlineDateValue}
+                                onChange={e => setInlineDateValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter' && inlineDateValue) {
+                                    let finalDate = inlineDateValue;
+                                    
+                                    // If user typed just a number (e.g., "14")
+                                    if (/^\d{1,2}$/.test(inlineDateValue)) {
+                                      const monthParts = month.value.split('-');
+                                      finalDate = `${inlineDateValue.padStart(2, '0')}.${monthParts[1]}.2026`;
+                                    } else if (inlineDateValue.match(/^T(\d+)$/i)) {
+                                      const monthNum = inlineDateValue.match(/^T(\d+)$/i)![1].padStart(2, '0');
+                                      finalDate = `14.${monthNum}.2026`;
+                                    }
+
+                                    if (inlineEditingAudit.id) {
+                                      const updated = skinAudits.map(a => a.id === inlineEditingAudit.id ? { ...a, date: finalDate } : a);
+                                      onUpdateSkinAudits(updated);
+                                    } else {
+                                      handleToggleSkinAudit(customer.id, month.value, 'Khám', finalDate);
+                                    }
+                                    setInlineEditingAudit(null);
+                                  }
+                                  if (e.key === 'Escape') setInlineEditingAudit(null);
+                                }}
+                                autoFocus
+                                className="w-full py-1 text-[8px] font-bold text-center border-2 border-rose-400 rounded-lg outline-none"
+                                placeholder="14"
+                              />
+                              <div className="flex gap-1 justify-center">
+                                <button onClick={() => setInlineEditingAudit(null)} className="p-0.5 text-rose-500"><X className="w-2.5 h-2.5" /></button>
+                                <button 
+                                  onClick={() => {
+                                  if (!inlineDateValue) return;
+                                  let finalDate = inlineDateValue;
+                                  if (/^\d{1,2}$/.test(inlineDateValue)) {
+                                    const monthParts = month.value.split('-');
+                                    finalDate = `${inlineDateValue.padStart(2, '0')}.${monthParts[1]}.2026`;
+                                  } else if (inlineDateValue.match(/^T(\d+)$/i)) {
+                                    const monthNum = inlineDateValue.match(/^T(\d+)$/i)![1].padStart(2, '0');
+                                    finalDate = `14.${monthNum}.2026`;
+                                  }
+
+                                  if (inlineEditingAudit.id) {
+                                    const updated = skinAudits.map(a => a.id === inlineEditingAudit.id ? { ...a, date: finalDate } : a);
+                                    onUpdateSkinAudits(updated);
+                                  } else {
+                                    handleToggleSkinAudit(customer.id, month.value, 'Khám', finalDate);
+                                  }
+                                  setInlineEditingAudit(null);
+                                }}
+                                  className="p-0.5 text-emerald-500"
+                                >
+                                  <Save className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            !exam ? (
+                              <button 
+                                onClick={() => {
+                                  setInlineEditingAudit({ customerId: customer.id, month: month.value, type: 'Khám' });
+                                  setInlineDateValue("14");
+                                }}
+                                className="w-full py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 font-extrabold text-[8px] flex items-center justify-center active:scale-90 transition-all hover:bg-rose-100"
+                              >
+                                KHÁM
+                              </button>
+                            ) : (
+                              <div className="flex flex-col items-center gap-0.5 w-full">
+                                <span className="text-[9px] font-black text-rose-600 underline leading-none">{exam.date.split('.')[0]}</span>
+                                <div className="flex gap-1">
+                                  <button 
+                                    onClick={() => {
+                                      setInlineEditingAudit({ customerId: customer.id, month: month.value, type: 'Khám', id: exam.id });
+                                      setInlineDateValue(exam.date);
+                                    }}
+                                    className="p-0.5 text-slate-400 hover:text-amber-500 transition-colors"
+                                  >
+                                    <Pencil className="w-2 h-2" />
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setConfirmConfig({
+                                        message: "Xóa ngày khám?",
+                                        action: () => {
+                                          handleToggleSkinAudit(customer.id, month.value, 'Khám');
+                                          setConfirmConfig(null);
+                                        }
+                                      });
+                                    }}
+                                    className="p-0.5 text-slate-400 hover:text-rose-500 transition-colors"
+                                  >
+                                    <Trash2 className="w-2 h-2" />
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          )}
+  
+                          {/* Kiểm tra Logic */}
+                          {inlineEditingAudit?.customerId === customer.id && 
+                           inlineEditingAudit.month === month.value && 
+                           inlineEditingAudit.type === 'Kiểm tra' ? (
+                            <div className="w-full flex flex-col gap-1 mt-1">
+                              <input 
+                                type="text"
+                                value={inlineDateValue}
+                                onChange={e => setInlineDateValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter' && inlineDateValue) {
+                                    let finalDate = inlineDateValue;
+
+                                    if (/^\d{1,2}$/.test(inlineDateValue)) {
+                                      const monthParts = month.value.split('-');
+                                      finalDate = `${inlineDateValue.padStart(2, '0')}.${monthParts[1]}.2026`;
+                                    } else if (inlineDateValue.match(/^T(\d+)$/i)) {
+                                      const monthNum = inlineDateValue.match(/^T(\d+)$/i)![1].padStart(2, '0');
+                                      finalDate = `14.${monthNum}.2026`;
+                                    }
+
+                                    if (inlineEditingAudit.id) {
+                                      const updated = skinAudits.map(a => a.id === inlineEditingAudit.id ? { ...a, date: finalDate } : a);
+                                      onUpdateSkinAudits(updated);
+                                    } else {
+                                      handleToggleSkinAudit(customer.id, month.value, 'Kiểm tra', finalDate);
+                                    }
+                                    setInlineEditingAudit(null);
+                                  }
+                                  if (e.key === 'Escape') setInlineEditingAudit(null);
+                                }}
+                                autoFocus
+                                className="w-full py-1 text-[8px] font-bold text-center border-2 border-emerald-400 rounded-lg outline-none"
+                                placeholder="14"
+                              />
+                              <div className="flex gap-1 justify-center">
+                                <button onClick={() => setInlineEditingAudit(null)} className="p-0.5 text-rose-500"><X className="w-2.5 h-2.5" /></button>
+                                <button 
+                                  onClick={() => {
+                                    if (!inlineDateValue) return;
+                                    let finalDate = inlineDateValue;
+                                    if (/^\d{1,2}$/.test(inlineDateValue)) {
+                                      const monthParts = month.value.split('-');
+                                      finalDate = `${inlineDateValue.padStart(2, '0')}.${monthParts[1]}.2026`;
+                                    } else if (inlineDateValue.match(/^T(\d+)$/i)) {
+                                      const monthNum = inlineDateValue.match(/^T(\d+)$/i)![1].padStart(2, '0');
+                                      finalDate = `14.${monthNum}.2026`;
+                                    }
+
+                                    if (inlineEditingAudit.id) {
+                                      const updated = skinAudits.map(a => a.id === inlineEditingAudit.id ? { ...a, date: finalDate } : a);
+                                      onUpdateSkinAudits(updated);
+                                    } else {
+                                      handleToggleSkinAudit(customer.id, month.value, 'Kiểm tra', finalDate);
+                                    }
+                                    setInlineEditingAudit(null);
+                                  }}
+                                  className="p-0.5 text-emerald-500"
+                                >
+                                  <Save className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            !check ? (
+                              !exam && (
+                                <button 
+                                  onClick={() => {
+                                    setInlineEditingAudit({ customerId: customer.id, month: month.value, type: 'Kiểm tra' });
+                                    setInlineDateValue("14");
+                                  }}
+                                  className="w-full py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 font-extrabold text-[8px] flex items-center justify-center active:scale-90 transition-all hover:bg-emerald-100"
+                                >
+                                  K.TRA
+                                </button>
+                              )
+                            ) : (
+                              <div className="flex flex-col items-center gap-0.5 w-full mt-1">
+                                <span className="text-[9px] font-black text-emerald-600 underline leading-none">{check.date.split('.')[0]}</span>
+                                <div className="flex gap-1">
+                                  <button 
+                                    onClick={() => {
+                                      setInlineEditingAudit({ customerId: customer.id, month: month.value, type: 'Kiểm tra', id: check.id });
+                                      setInlineDateValue(check.date);
+                                    }}
+                                    className="p-0.5 text-slate-400 hover:text-amber-500 transition-colors"
+                                  >
+                                    <Pencil className="w-2 h-2" />
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setConfirmConfig({
+                                        message: "Xóa ngày kiểm tra?",
+                                        action: () => {
+                                          handleToggleSkinAudit(customer.id, month.value, 'Kiểm tra');
+                                          setConfirmConfig(null);
+                                        }
+                                      });
+                                    }}
+                                    className="p-0.5 text-slate-400 hover:text-rose-500 transition-colors"
+                                  >
+                                    <Trash2 className="w-2 h-2" />
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          )}
                         </div>
                       );
                     })}
@@ -778,9 +1004,9 @@ export default function CustomerManagementModal({
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button 
-                      onClick={() => onViewDebtHistory(customer.id)}
+                      onClick={() => setShowAuditHistoryCustId(customer.id)}
                       className="p-2 text-amber-500 bg-white border border-amber-100 rounded-lg shadow-sm hover:bg-amber-50 active:scale-90 transition-all cursor-pointer"
-                      title="Lịch sử công nợ"
+                      title="Lịch sử khám & số dư"
                     >
                       <History className="w-3.5 h-3.5" />
                     </button>
@@ -842,6 +1068,67 @@ export default function CustomerManagementModal({
           />
         )}
 
+        {showAuditHistoryCustId && (
+          <motion.div className="absolute inset-0 flex items-center justify-center bg-black/60 z-[2200] p-4 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-2xl rounded-[32px] flex flex-col shadow-2xl relative max-h-[85vh] overflow-hidden">
+              <div className="p-6 border-b border-pastel-border flex items-center justify-between bg-amber-50/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center text-white shadow-lg shadow-amber-100">
+                    <History className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800">Lịch sử khách hàng</h3>
+                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">{customers.find(c => c.id === showAuditHistoryCustId)?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowAuditHistoryCustId(null)} className="p-2 hover:bg-rose-50 rounded-xl text-slate-400 hover:text-rose-500 transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+                {/* Balance History Section */}
+                <div>
+                  <h4 className="text-[10px] font-black text-pastel-subtext uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Wallet className="w-3 h-3" /> Lịch sử số dư & Giao dịch
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 italic">Số dư khởi tạo</span>
+                      <span className="text-sm font-black text-slate-700">
+                        {(customers.find(c => c.id === showAuditHistoryCustId)?.initialDebt || 0).toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+                    {transactions
+                      .filter(t => t.customerId === showAuditHistoryCustId)
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map(t => (
+                        <div key={t.id} className="p-3 bg-white border border-pastel-border rounded-xl flex items-center justify-between hover:bg-slate-50 transition-colors">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 uppercase">{t.date}</span>
+                            <span className="text-xs font-bold text-slate-700 truncate max-w-[200px]">{t.reason || "Giao dịch..."}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className={cn("text-xs font-black", t.type === 'Chi' ? "text-rose-500" : "text-emerald-500")}>
+                              {t.type === 'Chi' ? "+" : "-"}{t.amount.toLocaleString('vi-VN')}
+                            </span>
+                            <div className="text-[8px] font-bold text-pastel-subtext uppercase">{t.type === 'Chi' ? "Khách nợ thêm" : "Khách đã trả"}</div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="h-[1px] bg-pastel-border/50" />
+              </div>
+              
+              <div className="p-6 border-t border-pastel-border bg-pastel-bg/10">
+                <button onClick={() => setShowAuditHistoryCustId(null)} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-sm active:scale-95 transition-all shadow-xl">ĐÓNG LỊCH SỬ</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {showGroupManagement && (
           <motion.div className="absolute inset-0 flex items-center justify-center bg-black/60 z-[2100] p-4 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-md rounded-[32px] flex flex-col shadow-2xl relative max-h-[80vh]">
@@ -901,16 +1188,47 @@ export default function CustomerManagementModal({
               <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
                 {customerGroups.map(group => (
                   <div key={group.id} className="flex items-center justify-between p-4 bg-white border border-pastel-border rounded-2xl hover:bg-violet-50 transition-colors">
-                    <span className="font-bold text-slate-700">{group.name}</span>
+                    {editingGroupId === group.id ? (
+                      <input 
+                        type="text" 
+                        value={newGroupName} 
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (!newGroupName.trim()) return;
+                            onUpdateGroups(customerGroups.map(g => g.id === group.id ? { ...g, name: newGroupName.trim() } : g));
+                            setEditingGroupId(null);
+                            setNewGroupName("");
+                          } else if (e.key === 'Escape') {
+                            setEditingGroupId(null);
+                            setNewGroupName("");
+                          }
+                        }}
+                        autoFocus
+                        className="flex-1 mr-4 bg-white border border-violet-300 rounded-lg px-3 py-1 text-sm font-bold outline-none ring-2 ring-violet-100"
+                      />
+                    ) : (
+                      <span className="font-bold text-slate-700">{group.name}</span>
+                    )}
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => {
-                          setEditingGroupId(group.id);
-                          setNewGroupName(group.name);
+                          if (editingGroupId === group.id) {
+                            if (!newGroupName.trim()) return;
+                            onUpdateGroups(customerGroups.map(g => g.id === group.id ? { ...g, name: newGroupName.trim() } : g));
+                            setEditingGroupId(null);
+                            setNewGroupName("");
+                          } else {
+                            setEditingGroupId(group.id);
+                            setNewGroupName(group.name);
+                          }
                         }}
-                        className="p-2 text-violet-500 hover:bg-violet-100 rounded-lg transition-colors"
+                        className={cn(
+                          "p-2 rounded-lg transition-colors",
+                          editingGroupId === group.id ? "text-emerald-500 hover:bg-emerald-100" : "text-violet-500 hover:bg-violet-100"
+                        )}
                       >
-                        <Pencil className="w-4 h-4" />
+                        {editingGroupId === group.id ? <Save className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
                       </button>
                       <button 
                         onClick={() => {

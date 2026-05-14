@@ -55,6 +55,7 @@ export interface Customer {
   address?: string;
   initialDebt?: number;
   skinIssues?: string[];
+  phone?: string;
 }
 
 export interface UserAccount {
@@ -71,6 +72,11 @@ export interface Brand {
 }
 
 export interface SkinIssue {
+  id: string;
+  name: string;
+}
+
+export interface Ingredient {
   id: string;
   name: string;
 }
@@ -98,6 +104,8 @@ export interface Product {
     daysToUse?: number;
     mfgDate?: string;
     expDate?: string;
+    skinIssues?: string[];
+    mainIngredients?: string[];
   };
 }
 
@@ -173,6 +181,8 @@ export interface ImportItem {
   quantity: number;
   importPrice: number;
   subtotal: number;
+  mfgDate?: string;
+  expDate?: string;
 }
 
 export interface ImportOrder {
@@ -193,6 +203,7 @@ export interface AppData {
   users?: UserAccount[];
   brands?: Brand[];
   skinIssues?: SkinIssue[];
+  mainIngredients?: Ingredient[];
   productCategories?: ProductCategory[];
   products?: Product[];
   skinAudits?: SkinAuditEntry[];

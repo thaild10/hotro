@@ -84,8 +84,13 @@ export default function LedgerModal({
   const [selectedDebtHistory, setSelectedDebtHistory] = useState<Customer | null>(null);
 
   React.useEffect(() => {
-    // If initialCustomerDebtId is provided, we should probably redirect elsewhere, 
-    // but for now we just avoid the crash. In KanbanApp, this will be handled.
+    if (initialCustomerDebtId) {
+      const customer = customers.find(c => c.id === initialCustomerDebtId);
+      if (customer) {
+        setSelectedDebtHistory(customer);
+        setActiveView('transactions');
+      }
+    }
   }, [initialCustomerDebtId, customers]);
 
   const [showAccountForm, setShowAccountForm] = useState(false);
@@ -110,6 +115,7 @@ export default function LedgerModal({
   const [confirmConfig, setConfirmConfig] = useState<{message: string, action: () => void} | null>(null);
   const [pinInput, setPinInput] = useState<{message: string, action: () => void} | null>(null);
   const [pinValue, setPinValue] = useState("");
+  const [pinAccountName, setPinAccountName] = useState("");
   const [pinError, setPinError] = useState(false);
 
   // Derived data
@@ -132,10 +138,14 @@ export default function LedgerModal({
   }, [accounts, accountBalances]);
 
   const sortedTransactions = useMemo(() => {
-    return [...transactions]
-      .filter(t => t.type === activeTab)
-      .sort((a, b) => b.createdAt - a.createdAt);
-  }, [transactions, activeTab]);
+    let list = [...transactions];
+    if (selectedDebtHistory) {
+      list = list.filter(t => t.customerId === selectedDebtHistory.id);
+    } else {
+      list = list.filter(t => t.type === activeTab);
+    }
+    return list.sort((a, b) => b.createdAt - a.createdAt);
+  }, [transactions, activeTab, selectedDebtHistory]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -260,18 +270,22 @@ export default function LedgerModal({
   // Purpose Handlers
   const handleSavePurpose = () => {
     if (!purposeName.trim()) return;
-    confirmAction(`Bạn có chắc muốn ${editingPurposeId ? 'cập nhật' : 'tạo'} mục đích này?`, () => {
-      if (editingPurposeId) {
-        const updated = purposes.map(p => p.id === editingPurposeId ? { ...p, name: purposeName } : p);
-        onUpdatePurposes(updated);
-        addLog("Sửa", "Mục đích", `Sửa mục đích ${purposeName}`);
-      } else {
-        const newPurp: LedgerPurpose = { id: `purp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: purposeName, type: 'Thu' }; // Type is ignored but kept for compatibility
-        onUpdatePurposes([...purposes, newPurp]);
-        addLog("Tạo", "Mục đích", `Tạo mục đích ${purposeName}`);
-      }
-      resetPurposeForm();
-    });
+    
+    if (editingPurposeId) {
+      confirmAction(`Bạn có chắc muốn cập nhật mục đích này?`, () => {
+        requirePin("Nhập mật khẩu để sửa", () => {
+          const updated = purposes.map(p => p.id === editingPurposeId ? { ...p, name: purposeName } : p);
+          onUpdatePurposes(updated);
+          addLog("Sửa", "Mục đích", `Sửa mục đích ${purposeName}`);
+          resetPurposeForm();
+        });
+      });
+    } else {
+      const newPurp: LedgerPurpose = { id: `purp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name: purposeName, type: 'Thu' };
+      onUpdatePurposes([newPurp, ...purposes]);
+      addLog("Tạo", "Mục đích", `Tạo mục đích ${purposeName}`);
+      setPurposeName("");
+    }
   };
 
   const resetPurposeForm = () => {
@@ -281,16 +295,15 @@ export default function LedgerModal({
   };
 
   const handleEditPurpose = (p: LedgerPurpose) => {
-    confirmAction(`Bạn có chắc muốn sửa mục đích ${p.name}?`, () => {
-      requirePin("Nhập mật khẩu để sửa mục đích", () => {
-        setEditingPurposeId(p.id);
-        setPurposeName(p.name);
-        setShowPurposeForm(true);
-      });
-    });
+    setEditingPurposeId(p.id);
+    setPurposeName(p.name);
+    setShowPurposeForm(true);
   };
 
   const handleDeletePurpose = (id: string, name: string) => {
+    const mandatoryNames = ['Khách', 'Chỉnh số dư', 'Lương', 'Nhập hàng'];
+    if (mandatoryNames.includes(name)) return;
+
     confirmAction(`Bạn có chắc muốn xóa mục đích ${name}?`, () => {
       requirePin(`Nhập mật khẩu để xóa mục đích ${name}`, () => {
         onUpdatePurposes(purposes.filter(p => p.id !== id));
@@ -402,7 +415,6 @@ export default function LedgerModal({
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-800 leading-tight">Thu Chi</h2>
-              <p className="text-[9px] font-bold text-rose-500 uppercase tracking-wider">Quản lý tài chính</p>
             </div>
           </div>
         </div>
@@ -477,25 +489,36 @@ export default function LedgerModal({
 
               {/* Transactions Header & Tabs */}
               <div className="p-4 bg-pastel-bg/30 border-b border-pastel-border flex flex-wrap items-center justify-between gap-4">
-                <div className="flex bg-white rounded-xl p-1 border border-pastel-border shadow-sm">
-                  <button 
-                    onClick={() => setActiveTab('Thu')}
-                    className={cn(
-                      "px-8 py-2 rounded-lg font-black text-sm transition-all",
-                      activeTab === 'Thu' ? "bg-emerald-500 text-white shadow-md" : "text-pastel-subtext"
-                    )}
-                  >
-                    THU
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('Chi')}
-                    className={cn(
-                      "px-8 py-2 rounded-lg font-black text-sm transition-all",
-                      activeTab === 'Chi' ? "bg-rose-500 text-white shadow-md" : "text-pastel-subtext"
-                    )}
-                  >
-                    CHI
-                  </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex bg-white rounded-xl p-1 border border-pastel-border shadow-sm">
+                    <button 
+                      onClick={() => { setActiveTab('Thu'); setSelectedDebtHistory(null); }}
+                      className={cn(
+                        "px-8 py-2 rounded-lg font-black text-sm transition-all",
+                        activeTab === 'Thu' && !selectedDebtHistory ? "bg-emerald-500 text-white shadow-md" : "text-pastel-subtext"
+                      )}
+                    >
+                      THU
+                    </button>
+                    <button 
+                      onClick={() => { setActiveTab('Chi'); setSelectedDebtHistory(null); }}
+                      className={cn(
+                        "px-8 py-2 rounded-lg font-black text-sm transition-all",
+                        activeTab === 'Chi' && !selectedDebtHistory ? "bg-rose-500 text-white shadow-md" : "text-pastel-subtext"
+                      )}
+                    >
+                      CHI
+                    </button>
+                  </div>
+                  {selectedDebtHistory && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+                      <HistoryIcon className="w-4 h-4 text-amber-500" />
+                      <span className="text-xs font-bold text-amber-700">Lịch sử: {selectedDebtHistory.name}</span>
+                      <button onClick={() => setSelectedDebtHistory(null)} className="ml-1 p-1 hover:bg-amber-100 rounded-full text-amber-400">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button 
@@ -518,13 +541,12 @@ export default function LedgerModal({
                 <table className="w-full text-left border-separate border-spacing-y-3">
                   <thead>
                     <tr className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest px-4">
-                      <th className="pb-2 pl-4 w-12 text-center">STT</th>
-                      <th className="pb-2">Mục đích</th>
-                      <th className="pb-2">Người / Khách</th>
-                      <th className="pb-2">Số tiền</th>
-                      <th className="pb-2">Tài khoản</th>
-                      <th className="pb-2">Thời gian</th>
-                      <th className="pb-2">Lý do</th>
+                      <th className="pb-2 pl-4 text-left">Thời gian</th>
+                      <th className="pb-2 text-left">Lý do</th>
+                      <th className="pb-2 text-left">Người / Khách</th>
+                      <th className="pb-2 text-left">Số tiền</th>
+                      <th className="pb-2 text-left">Tài khoản</th>
+                      <th className="pb-2 text-left">Mục đích</th>
                       <th className="pb-2 pr-4 text-center">Hành động</th>
                     </tr>
                   </thead>
@@ -536,11 +558,11 @@ export default function LedgerModal({
                       
                       return (
                         <tr key={tx.id} className="bg-white hover:bg-slate-50 transition-colors group">
-                          <td className="py-4 pl-4 rounded-l-2xl border-y border-l border-pastel-border text-center font-black text-pastel-subtext text-xs">
-                            {(currentPage - 1) * pageSize + idx + 1}
+                          <td className="py-4 pl-4 rounded-l-2xl border-y border-l border-pastel-border text-[11px] font-black text-emerald-600">
+                            {tx.date.split('-').slice(1).reverse().join('.')}
                           </td>
-                          <td className="py-4 border-y border-pastel-border text-sm font-bold text-slate-800">
-                             {purpose?.name || "Đã xóa"}
+                          <td className="py-4 border-y border-pastel-border text-xs font-bold italic text-slate-500 max-w-[150px] truncate">
+                            {tx.reason}
                           </td>
                           <td className="py-4 border-y border-pastel-border">
                             {purpose?.name === 'Khách' ? (
@@ -548,7 +570,7 @@ export default function LedgerModal({
                                 <div className="w-7 h-7 rounded-full bg-rose-50 flex items-center justify-center shrink-0">
                                   {customer?.imageUrl ? <img src={customer.imageUrl} className="w-full h-full object-cover rounded-full" /> : <User className="w-4 h-4 text-rose-400" />}
                                 </div>
-                                <span className="text-xs font-bold text-slate-700">{customer?.name || "Không tìm thấy"}</span>
+                                <span className="text-xs font-bold text-slate-700">{customer?.name || "N/A"}</span>
                               </div>
                             ) : (
                               <span className="text-xs font-medium text-pastel-subtext">-</span>
@@ -561,28 +583,25 @@ export default function LedgerModal({
                             {tx.type === 'Thu' ? '+' : '-'}{tx.amount.toLocaleString('vi-VN')}
                           </td>
                           <td className="py-4 border-y border-pastel-border text-xs font-bold text-slate-600">
-                            {account ? account.name : "Đã xóa"}
+                            {account ? account.name : ""}
                           </td>
-                          <td className="py-4 border-y border-pastel-border text-xs font-medium text-pastel-subtext">
-                            {formatIsoToPretty(tx.date)}
-                          </td>
-                          <td className="py-4 border-y border-pastel-border text-xs font-medium italic text-pastel-subtext max-w-[150px] truncate">
-                            {tx.reason}
+                          <td className="py-4 border-y border-pastel-border text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                             {purpose?.name || ""}
                           </td>
                           <td className="py-4 pr-4 rounded-r-2xl border-y border-r border-pastel-border text-center">
                             <div className="flex items-center justify-center gap-1">
-                              <button 
-                                onClick={() => handleEditTransaction(tx)}
-                                className="p-2 text-indigo-400 hover:text-indigo-600 active:scale-90"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteTransaction(tx)}
-                                className="p-2 text-rose-400 hover:text-rose-600 active:scale-90"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                                  <button 
+                                    onClick={() => handleEditTransaction(tx)}
+                                    className="p-2 text-indigo-400 hover:text-indigo-600 active:scale-90"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteTransaction(tx)}
+                                    className="p-2 text-rose-400 hover:text-rose-600 active:scale-90"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
                             </div>
                           </td>
                         </tr>
@@ -613,113 +632,144 @@ export default function LedgerModal({
           )}
 
           {activeView === 'accounts' && (
-            <div className="p-6 overflow-y-auto no-scrollbar">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-black text-slate-800 uppercase tracking-wider text-sm flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-emerald-500" /> Danh sách tài khoản
-                </h3>
-                <button 
-                  onClick={() => setShowAccountForm(true)}
-                  className="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-100"
-                >
-                  <Plus className="w-4 h-4" /> THÊM TÀI KHOẢN
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
-                {paginatedAccounts.map(acc => (
-                  <div key={acc.id} className="p-5 bg-pastel-bg/50 border border-pastel-border rounded-2xl relative group hover:border-emerald-300 transition-all shadow-sm">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-500 shadow-sm">
-                        <CreditCard className="w-6 h-6" />
-                      </div>
-                      <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => handleEditAccount(acc)}
-                          className="p-2 bg-white rounded-lg text-emerald-500 hover:bg-emerald-50 shadow-sm"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteAccount(acc.id, acc.name)}
-                          className="p-2 bg-white rounded-lg text-rose-500 hover:bg-rose-50 shadow-sm"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-black text-slate-800 text-base mb-1">{acc.name}</h4>
-                      <p className="text-xs font-mono font-bold text-pastel-subtext tracking-widest">{acc.accountNumber}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {accounts.length > 0 && (
-                <div className="border-t border-pastel-border pt-4 mt-auto">
-                  <Pagination 
-                    currentPage={currentPage}
-                    totalPages={Math.ceil(accounts.length / pageSize)}
-                    pageSize={pageSize}
-                    onPageChange={setCurrentPage}
-                    onPageSizeChange={setPageSize}
-                    totalItems={accounts.length}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeView === 'purposes' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-6 flex items-center justify-between border-b border-pastel-border bg-white shrink-0">
-                <h3 className="font-black text-slate-800 uppercase tracking-wider text-sm flex items-center gap-2">
-                  <Target className="w-5 h-5 text-amber-500" /> Mục đích
-                </h3>
+              <div className="p-4 flex items-center gap-2 border-b border-pastel-border bg-white shrink-0">
+                <input 
+                  type="text" 
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  className="flex-1 bg-pastel-bg border border-pastel-border rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
+                  placeholder="Tên chủ tài khoản"
+                />
+                <input 
+                  type="text" 
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  className="flex-1 bg-pastel-bg border border-pastel-border rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
+                  placeholder="Số tài khoản"
+                />
                 <button 
-                  onClick={() => setShowPurposeForm(true)}
-                  className="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-100"
+                  onClick={handleSaveAccount}
+                  className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100 active:scale-95 transition-all shrink-0"
                 >
-                  <Plus className="w-4 h-4" /> THÊM MỤC ĐÍCH
+                  {editingAccountId ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
                 </button>
+                {editingAccountId && (
+                  <button onClick={resetAccountForm} className="w-10 h-10 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center shrink-0">
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
                 <div className="bg-white border border-pastel-border rounded-[32px] overflow-hidden shadow-sm">
                   <div className="flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0">
                     <div className="w-12 text-center">STT</div>
-                    <div className="flex-1">Tên mục đích</div>
+                    <div className="flex-1">Tài khoản</div>
+                    <div className="w-24 text-right">Thao tác</div>
+                  </div>
+                  <div className="divide-y divide-pastel-border/30">
+                    {paginatedAccounts.map((acc, idx) => (
+                      <div key={acc.id} className="flex items-center gap-4 px-6 py-4 hover:bg-pastel-bg/30 transition-colors group">
+                        <span className="w-12 text-center text-xs font-black text-pastel-subtext">{(currentPage - 1) * pageSize + idx + 1}</span>
+                        <div className="flex-1">
+                          <h4 className="font-black text-slate-800 text-sm">{acc.name}</h4>
+                          <p className="text-[10px] font-bold text-pastel-subtext font-mono">{acc.accountNumber}</p>
+                        </div>
+                        <div className="w-24 flex justify-end gap-1.5 transition-opacity">
+                          <button 
+                            onClick={() => handleEditAccount(acc)}
+                            className="p-2 text-emerald-600 bg-emerald-50 rounded-lg shadow-sm border border-emerald-100 active:scale-90"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteAccount(acc.id, acc.name)}
+                            className="p-2 text-rose-500 bg-rose-50 rounded-lg shadow-sm border border-rose-100 active:scale-90"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {accounts.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-pastel-border">
+                    <Pagination 
+                      currentPage={currentPage}
+                      totalPages={Math.ceil(accounts.length / pageSize)}
+                      pageSize={pageSize}
+                      onPageChange={setCurrentPage}
+                      onPageSizeChange={setPageSize}
+                      totalItems={accounts.length}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeView === 'purposes' && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-4 flex items-center gap-2 border-b border-pastel-border bg-white shrink-0">
+                <input 
+                  type="text" 
+                  value={purposeName}
+                  onChange={(e) => setPurposeName(e.target.value)}
+                  className={cn(
+                    "flex-1 bg-pastel-bg border border-pastel-border rounded-xl px-4 py-2.5 text-sm font-bold outline-none",
+                    editingPurposeId && ['Khách', 'Chỉnh số dư', 'Lương', 'Nhập hàng'].includes(purposes.find(p => p.id === editingPurposeId)?.name || "") && "opacity-50 cursor-not-allowed"
+                  )}
+                  placeholder="Nhập mục đích muốn thêm"
+                  disabled={editingPurposeId ? ['Khách', 'Chỉnh số dư', 'Lương', 'Nhập hàng'].includes(purposes.find(p => p.id === editingPurposeId)?.name || "") : false}
+                />
+                <button 
+                  onClick={handleSavePurpose}
+                  className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-amber-100 active:scale-95 transition-all shrink-0"
+                >
+                  {editingPurposeId ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                </button>
+                {editingPurposeId && (
+                  <button onClick={resetPurposeForm} className="w-10 h-10 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center shrink-0">
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
+                <div className="bg-white border border-pastel-border rounded-[32px] overflow-hidden shadow-sm">
+                  <div className="flex px-6 py-4 bg-pastel-bg/50 border-b border-pastel-border text-[10px] font-black text-pastel-subtext uppercase tracking-widest shrink-0">
+                    <div className="w-12 text-center">STT</div>
+                    <div className="flex-1">Mục đích</div>
                     <div className="w-24 text-right">Thao tác</div>
                   </div>
                   <div className="divide-y divide-pastel-border/30">
                     {paginatedPurposes.map((p, idx) => {
-                      const isMandatory = p.name === 'Khách' || p.name === 'Chỉnh số dư';
+                      const mandatoryNames = ['Khách', 'Chỉnh số dư', 'Lương', 'Nhập hàng'];
+                      const isMandatory = mandatoryNames.includes(p.name);
                       return (
-                        <div key={p.id} className="flex items-center gap-4 px-6 py-4 hover:bg-pastel-bg/30 transition-colors">
+                        <div key={p.id} className="flex items-center gap-4 px-6 py-4 hover:bg-pastel-bg/30 transition-colors group">
                           <span className="w-12 text-center text-xs font-black text-pastel-subtext">{(currentPage - 1) * pageSize + idx + 1}</span>
                           <div className="flex-1">
                             <h4 className="font-black text-slate-800 text-sm">
                               {p.name} {isMandatory && <span className="text-rose-500">*</span>}
                             </h4>
                           </div>
-                          <div className="w-24 flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity-none">
-                            {!isMandatory ? (
-                              <>
-                                <button 
-                                  onClick={() => handleEditPurpose(p)}
-                                  className="p-2 text-amber-600 bg-amber-50 rounded-lg shadow-sm border border-amber-100 active:scale-90"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeletePurpose(p.id, p.name)}
-                                  className="p-2 text-rose-500 bg-rose-50 rounded-lg shadow-sm border border-rose-100 active:scale-90"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </>
-                            ) : (
-                              <span className="text-[10px] font-black text-pastel-subtext uppercase mr-2 italic">Hệ thống</span>
+                          <div className="w-24 flex justify-end gap-1.5 transition-opacity">
+                            <button 
+                              onClick={() => handleEditPurpose(p)}
+                              className="p-2 text-amber-600 bg-amber-50 rounded-lg shadow-sm border border-amber-100 active:scale-90"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            {!isMandatory && (
+                              <button 
+                                onClick={() => handleDeletePurpose(p.id, p.name)}
+                                className="p-2 text-rose-500 bg-rose-50 rounded-lg shadow-sm border border-rose-100 active:scale-90"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             )}
                           </div>
                         </div>
@@ -810,14 +860,23 @@ export default function LedgerModal({
               <div className="flex-1 overflow-y-auto p-6 space-y-5 no-scrollbar">
                 <div>
                   <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1 mb-1.5 block">Chọn tài khoản</label>
-                  <select 
-                    value={transactionForm.accountId}
-                    onChange={(e) => setTransactionForm({ ...transactionForm, accountId: e.target.value })}
-                    className="w-full bg-pastel-bg border border-pastel-border rounded-xl p-3 text-sm font-bold outline-none focus:border-emerald-300"
-                  >
-                    <option value="">-- Chọn tài khoản --</option>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.accountNumber})</option>)}
-                  </select>
+                  <div className="flex gap-2">
+                    <select 
+                      value={transactionForm.accountId}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, accountId: e.target.value })}
+                      className="flex-1 bg-pastel-bg border border-pastel-border rounded-xl p-3 text-sm font-bold outline-none focus:border-emerald-300"
+                    >
+                      <option value="">-- Chọn tài khoản --</option>
+                      {accounts.map(a => <option key={a.id} value={a.id}>{a.name} - {a.accountNumber}</option>)}
+                    </select>
+                    <button 
+                      onClick={() => setActiveView('accounts')}
+                      className="w-12 h-12 bg-white border border-pastel-border rounded-xl flex items-center justify-center text-emerald-500 shadow-sm active:scale-95"
+                      title="Thêm tài khoản"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="text-[11px] font-black text-pastel-subtext uppercase tracking-widest ml-1 mb-1.5 block">Mục đích</label>
@@ -950,19 +1009,30 @@ export default function LedgerModal({
                   <AlertCircle className="w-10 h-10" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">Yêu cầu xác minh</h3>
-                <p className="text-sm font-medium text-pastel-subtext mb-6">Nhập mật khẩu tài khoản để thực hiện hành động này</p>
-                <input 
-                  type="password"
-                  value={pinValue}
-                  onChange={(e) => setPinValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handlePinConfirm()}
-                  className={cn(
-                    "w-full bg-pastel-bg border-4 rounded-2xl p-4 text-center text-sm font-black outline-none transition-all mb-6",
-                    pinError ? "border-red-500" : "border-pastel-border focus:border-rose-400"
-                  )}
-                  placeholder="Mật khẩu"
-                  autoFocus
-                />
+                <p className="text-sm font-medium text-pastel-subtext mb-6">Nhập tên tài khoản & mật khẩu để thực hiện hành động này</p>
+                <div className="space-y-3 mb-6">
+                  <input 
+                    type="text"
+                    value={pinAccountName}
+                    onChange={(e) => setPinAccountName(e.target.value)}
+                    className={cn(
+                      "w-full bg-pastel-bg border-4 rounded-2xl p-4 text-center text-sm font-black outline-none transition-all",
+                      pinError ? "border-red-500" : "border-pastel-border focus:border-rose-400"
+                    )}
+                    placeholder="Tên tài khoản"
+                  />
+                  <input 
+                    type="password"
+                    value={pinValue}
+                    onChange={(e) => setPinValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handlePinConfirm()}
+                    className={cn(
+                      "w-full bg-pastel-bg border-4 rounded-2xl p-4 text-center text-sm font-black outline-none transition-all",
+                      pinError ? "border-red-500" : "border-pastel-border focus:border-rose-400"
+                    )}
+                    placeholder="Mật khẩu"
+                  />
+                </div>
                 <div className="flex gap-3">
                   <button 
                     onClick={() => { setPinInput(null); setPinValue(""); setPinError(false); }} 

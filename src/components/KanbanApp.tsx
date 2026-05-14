@@ -41,6 +41,7 @@ import {
   CustomerGroup,
   UserAccount,
   Brand,
+  Ingredient,
   ProductCategory,
   Product,
   SkinAuditEntry,
@@ -135,6 +136,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
   const [historyCardId, setHistoryCardId] = useState<string | null>(null);
   const [noteEditCardId, setNoteEditCardId] = useState<string | null>(null);
   const [doctorReplyCardId, setDoctorReplyCardId] = useState<string | null>(null);
+  const [editingReplyIndex, setEditingReplyIndex] = useState<number | null>(null);
   const [addDoCardId, setAddDoCardId] = useState<string | null>(null);
   const [showTagManagement, setShowTagManagement] = useState(false);
   const [showCustomerManagement, setShowCustomerManagement] = useState(false);
@@ -147,6 +149,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
   const [brands, setBrands] = useState<Brand[]>(initialData.brands || []);
   const [skinIssues, setSkinIssues] = useState<SkinIssue[]>(initialData.skinIssues || []);
+  const [mainIngredients, setMainIngredients] = useState<Ingredient[]>(initialData.mainIngredients || []);
   const [productCategories, setProductCategories] = useState<ProductCategory[]>(initialData.productCategories || []);
   const [products, setProducts] = useState<Product[]>(initialData.products || []);
   const [showProductManagement, setShowProductManagement] = useState(false);
@@ -216,6 +219,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const serverUsers = initialData.users || [];
     const serverBrands = initialData.brands || [];
     const serverSkinIssues = initialData.skinIssues || [];
+    const serverMainIngredients = initialData.mainIngredients || [];
     const serverProductCategories = initialData.productCategories || [];
     const serverProducts = initialData.products || [];
     const serverCustomerGroups = initialData.customerGroups || [];
@@ -231,6 +235,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       const usersMatch = JSON.stringify(serverUsers) === JSON.stringify(users);
       const brandsMatch = JSON.stringify(serverBrands) === JSON.stringify(brands);
       const skinIssuesMatch = JSON.stringify(serverSkinIssues) === JSON.stringify(skinIssues);
+      const mainIngredientsMatch = JSON.stringify(serverMainIngredients) === JSON.stringify(mainIngredients);
       const categoriesMatch = JSON.stringify(serverProductCategories) === JSON.stringify(productCategories);
       const productsMatch = JSON.stringify(serverProducts) === JSON.stringify(products);
       const groupsMatch = JSON.stringify(serverCustomerGroups) === JSON.stringify(customerGroups);
@@ -276,6 +281,9 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       }
       if (!skinIssuesMatch) {
         setSkinIssues(serverSkinIssues);
+      }
+      if (!mainIngredientsMatch) {
+        setMainIngredients(serverMainIngredients);
       }
       if (!categoriesMatch) {
         setProductCategories(serverProductCategories);
@@ -350,6 +358,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
       doctorText: c.doctorText || "",
       doctorDate: c.doctorDate || "",
       doctorHidden: !!c.doctorHidden,
+      doctorReplies: c.doctorReplies || [],
       notified: !!c.notified,
       notifiedTime: c.notifiedTime || "",
       products: c.products || []
@@ -359,6 +368,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     users,
     brands,
     skinIssues,
+    mainIngredients,
     productCategories,
     products,
     customerGroups,
@@ -397,11 +407,11 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
     const hasChanges = JSON.stringify(normalizedLocal) !== JSON.stringify(normalizedRemote);
 
     if (hasChanges && saveStatus !== "saving" && saveStatus !== "quota-exceeded") {
-      const timer = setTimeout(() => performSave(normalizedLocal), 120000); // 2 minutes auto-save
+      const timer = setTimeout(() => performSave(normalizedLocal), 2000); // 2 seconds auto-save
       return () => clearTimeout(timer);
     }
   }, [
-    cards, tagsConfig, customers, users, brands, skinIssues, 
+    cards, tagsConfig, customers, users, brands, skinIssues, mainIngredients,
     productCategories, products, customerGroups, skinAudits, 
     skinAuditLogs, compressionSettings, ledgerAccounts, 
     ledgerPurposes, ledgerTransactions, ledgerLogs, orders, 
@@ -564,6 +574,26 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
   const doctorRepliedNotNotifiedCards = useMemo(() => {
     return cards.filter(c => c.tabId !== 7 && c.doctorText && !c.notified);
+  }, [cards]);
+
+  const reminderCount = useMemo(() => {
+    const today = parseDateString(getTodayFormatted()).getTime();
+    
+    // Section 1: Overdue/Today Grouped by name
+    const dueToday = cards.filter(c => c.tabId !== 7 && c.doDate && parseDateString(c.doDate).getTime() <= today);
+    const seenDue = new Set<string>();
+    for (const c of dueToday) {
+      seenDue.add(c.name.toLowerCase().trim());
+    }
+
+    // Section 2: Replied Grouped by name
+    const replied = cards.filter(c => c.tabId !== 7 && c.doctorText && !c.doctorHidden && !c.notified);
+    const seenReplied = new Set<string>();
+    for (const c of replied) {
+      seenReplied.add(c.name.toLowerCase().trim());
+    }
+
+    return seenDue.size + seenReplied.size;
   }, [cards]);
 
   const filteredCards = useMemo(() => {
@@ -763,7 +793,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                         <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center transition-colors group-hover:bg-white text-amber-500">
                           <Package className="w-4 h-4" />
                         </div>
-                        Quản lý sản phẩm
+                        Sản phẩm
                       </button>
 
                       <button 
@@ -773,18 +803,19 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                         <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center transition-colors group-hover:bg-white text-orange-500">
                           <Building className="w-4 h-4" />
                         </div>
-                        Quản lý nhà cung cấp
+                        Nhà cung cấp
                       </button>
 
                       <button 
                         onClick={() => { setCurrentView('imports'); setShowFeaturesMenu(false); }}
                         className="w-full px-4 py-3 text-left hover:bg-rose-50 flex items-center gap-3 text-sm font-bold text-slate-700 rounded-2xl transition-colors group"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center transition-colors group-hover:bg-white text-blue-500">
-                          <Plus className="w-4 h-4" />
+                        <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center transition-colors group-hover:bg-white text-cyan-500">
+                          <ShoppingCart className="w-4 h-4" />
                         </div>
-                        Nhập hàng mới
+                        Nhập hàng
                       </button>
+
                       <div className="h-px bg-rose-50 mx-2 mb-1 mt-1" />
                     </>
                   )}
@@ -882,7 +913,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                       "ml-1.5 inline-flex items-center justify-center text-[10px] px-1.5 py-0.5 rounded-lg font-black",
                       isActive ? "bg-rose-500 text-white" : "bg-rose-100 text-rose-500"
                     )}>
-                      {overdueCards.length + doctorRepliedNotNotifiedCards.length}
+                      {reminderCount}
                     </span>
                   )}
                 </button>
@@ -902,8 +933,8 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                   <>
                     {/* Section 1: Overdue/Today */}
                     {(() => {
-                      const today = getTodayFormatted();
-                      const dueToday = cards.filter(c => c.tabId !== 0 && c.tabId !== 7 && c.doDate <= today);
+                      const today = parseDateString(getTodayFormatted()).getTime();
+                      const dueToday = cards.filter(c => c.tabId !== 7 && c.doDate && parseDateString(c.doDate).getTime() <= today);
                       const mergedDue = [];
                       const seenDue = new Set();
                       for (const c of dueToday) {
@@ -917,11 +948,11 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                       return (
                         <div className="space-y-4 mb-8">
                           <div className="px-3 py-1.5 bg-rose-50 rounded-xl inline-block border border-rose-100">
-                            <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Lịch đã đến hoặc quá hạn hôm nay ({mergedDue.length})</span>
+                            <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">LỊCH ĐÃ ĐẾN HOẶC QUÁ HẠN HÔM NAY ({mergedDue.length})</span>
                           </div>
                           {mergedDue.map((card, index) => (
                             <Card 
-                              key={card.id}
+                              key={`due-${card.id}`}
                               card={card}
                               customers={customers}
                               products={products}
@@ -933,12 +964,16 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                               onTagEdit={() => setTagModalCardId(card.id)}
                               onHistory={() => setHistoryCardId(card.id)}
                               onNoteEdit={() => setNoteEditCardId(card.id)}
-                              onDoctorReply={() => setDoctorReplyCardId(card.id)}
+                              onDoctorReply={(idx) => {
+                                setDoctorReplyCardId(card.id);
+                                if (idx !== undefined) setEditingReplyIndex(idx);
+                              }}
                               onNotify={() => {
                                 confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
                               }}
                               onAddDo={() => setAddDoCardId(card.id)}
                               updateCard={updateCard}
+                              confirmAction={confirmAction}
                             />
                           ))}
                         </div>
@@ -947,7 +982,7 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
                     {/* Section 2: Replied not notified */}
                     {(() => {
-                      const replied = cards.filter(c => c.tabId !== 0 && c.tabId !== 7 && c.doctorText && !c.doctorHidden && !c.notified);
+                      const replied = cards.filter(c => c.tabId !== 7 && c.doctorText && !c.doctorHidden && !c.notified);
                       const mergedReplied = [];
                       const seenReplied = new Set();
                       for (const c of replied) {
@@ -961,11 +996,11 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                       return (
                         <div className="space-y-4 pt-4 border-t border-rose-100">
                           <div className="px-3 py-1.5 bg-violet-50 rounded-xl inline-block border border-violet-100">
-                            <span className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Bác sĩ phản hồi - Chưa báo khách ({mergedReplied.length})</span>
+                            <span className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Bác sĩ trả lời - Chưa báo khách ({mergedReplied.length})</span>
                           </div>
                           {mergedReplied.map((card, index) => (
                             <Card 
-                              key={card.id}
+                              key={`replied-${card.id}`}
                               card={card}
                               customers={customers}
                               products={products}
@@ -977,12 +1012,16 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                               onTagEdit={() => setTagModalCardId(card.id)}
                               onHistory={() => setHistoryCardId(card.id)}
                               onNoteEdit={() => setNoteEditCardId(card.id)}
-                              onDoctorReply={() => setDoctorReplyCardId(card.id)}
+                              onDoctorReply={(idx) => {
+                                setDoctorReplyCardId(card.id);
+                                if (idx !== undefined) setEditingReplyIndex(idx);
+                              }}
                               onNotify={() => {
                                 confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
                               }}
                               onAddDo={() => setAddDoCardId(card.id)}
                               updateCard={updateCard}
+                              confirmAction={confirmAction}
                             />
                           ))}
                         </div>
@@ -1004,12 +1043,16 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
                       onTagEdit={() => setTagModalCardId(card.id)}
                       onHistory={() => setHistoryCardId(card.id)}
                       onNoteEdit={() => setNoteEditCardId(card.id)}
-                      onDoctorReply={() => setDoctorReplyCardId(card.id)}
+                      onDoctorReply={(idx) => {
+                        setDoctorReplyCardId(card.id);
+                        if (idx !== undefined) setEditingReplyIndex(idx);
+                      }}
                       onNotify={() => {
                         confirmAction("Báo khách?", () => addLog(card.id, "Báo khách"));
                       }}
                       onAddDo={() => setAddDoCardId(card.id)}
                       updateCard={updateCard}
+                      confirmAction={confirmAction}
                     />
                   ))
                 )
@@ -1067,27 +1110,33 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         ) : currentView === 'orders' ? (
           <OrderManagementModal 
             orders={orders}
+            importOrders={importOrders}
+            suppliers={suppliers}
             customers={customers}
             products={products}
             onUpdateOrders={setOrders}
+            onUpdateImportOrders={setImportOrders}
             onUpdateTransactions={setLedgerTransactions}
             onUpdateLogs={setLedgerLogs}
             ledgerTransactions={ledgerTransactions}
             ledgerPurposes={ledgerPurposes}
             ledgerAccounts={ledgerAccounts}
             ledgerLogs={ledgerLogs}
+            users={users}
             onUpdateCustomers={setCustomers}
             customerGroups={customerGroups}
             onUpdateGroups={setCustomerGroups}
             onViewDebtHistory={(id) => {
               setDebtHistoryCustomerId(id);
               setCurrentView('ledger');
+              setShowCustomerManagement(false);
             }}
             onAddCardLog={addCardLogByCustomer}
             compressionSettings={compressionSettings}
             skinAudits={skinAudits}
             skinAuditLogs={skinAuditLogs}
             skinIssues={skinIssues}
+            brands={brands}
             onUpdateSkinAudits={setSkinAudits}
             onUpdateSkinAuditLogs={setSkinAuditLogs}
             username={username}
@@ -1153,36 +1202,41 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
           />
         )}
  
-        {showOrderManagement && (
+        {currentView === 'orders' && (
           <OrderManagementModal 
             orders={orders}
+            importOrders={importOrders}
+            suppliers={suppliers}
             customers={customers}
             products={products}
             onUpdateOrders={setOrders}
+            onUpdateImportOrders={setImportOrders}
             onUpdateTransactions={setLedgerTransactions}
             onUpdateLogs={setLedgerLogs}
             ledgerTransactions={ledgerTransactions}
             ledgerPurposes={ledgerPurposes}
             ledgerAccounts={ledgerAccounts}
             ledgerLogs={ledgerLogs}
+            users={users}
             onUpdateCustomers={setCustomers}
             customerGroups={customerGroups}
             onUpdateGroups={setCustomerGroups}
             onViewDebtHistory={(id) => {
               setDebtHistoryCustomerId(id);
               setCurrentView('ledger');
-              setShowOrderManagement(false);
             }}
             onAddCardLog={addCardLogByCustomer}
             compressionSettings={compressionSettings}
             skinAudits={skinAudits}
             skinAuditLogs={skinAuditLogs}
             skinIssues={skinIssues}
+            brands={brands}
             onUpdateSkinAudits={setSkinAudits}
             onUpdateSkinAuditLogs={setSkinAuditLogs}
             username={username}
-            onClose={() => setShowOrderManagement(false)}
+            onClose={() => setCurrentView('kanban')}
             deviceView={deviceView}
+            isPage={false} // Overlay mode
           />
         )}
  
@@ -1257,13 +1311,24 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
         {doctorReplyCardId && (
           <DoctorReplyModal 
             card={cards.find(c => c.id === doctorReplyCardId)!}
-            onClose={() => setDoctorReplyCardId(null)}
+            editingIndex={editingReplyIndex}
+            onClose={() => {
+              setDoctorReplyCardId(null);
+              setEditingReplyIndex(null);
+            }}
             onSave={(reply) => {
               const cardToEdit = cards.find(c => c.id === doctorReplyCardId)!;
               const oldReplies = cardToEdit.doctorReplies || (cardToEdit.doctorText ? [{text: cardToEdit.doctorText, date: cardToEdit.doctorDate || getTodayFormatted()}] : []);
               
               let newReplies = [...oldReplies];
-              if (cardToEdit.replyAgain) {
+              
+              if (editingReplyIndex !== null && editingReplyIndex < newReplies.length) {
+                if (reply.trim()) {
+                  newReplies[editingReplyIndex].text = reply;
+                } else {
+                  newReplies.splice(editingReplyIndex, 1);
+                }
+              } else if (cardToEdit.replyAgain) {
                 if (reply.trim()) {
                   newReplies.push({ text: reply, date: getTodayFormatted() });
                 }
@@ -1281,14 +1346,14 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
 
               const updates: Partial<KanbanCard> = { 
                 doctorReplies: newReplies,
-                doctorText: newReplies.length > 0 ? newReplies[newReplies.length - 1].text : undefined,
-                doctorDate: newReplies.length > 0 ? newReplies[newReplies.length - 1].date : undefined,
-                doctorHidden: newReplies.length === 0,
-                replyAgain: false
+                doctorText: newReplies.length > 0 ? newReplies[newReplies.length - 1].text : "",
+                replyAgain: false,
+                notified: false
               };
               updateCard(doctorReplyCardId, updates);
               addLog(doctorReplyCardId, "Bác sĩ phản hồi");
               setDoctorReplyCardId(null);
+              setEditingReplyIndex(null);
             }}
           />
         )}
@@ -1307,10 +1372,12 @@ export default function KanbanApp({ username, initialData, onLogout }: KanbanApp
             brands={brands}
             categories={productCategories}
             skinIssues={skinIssues}
+            mainIngredients={mainIngredients}
             products={products}
             onUpdateBrands={setBrands}
             onUpdateCategories={setProductCategories}
             onUpdateSkinIssues={setSkinIssues}
+            onUpdateIngredients={setMainIngredients}
             onUpdateProducts={setProducts}
             onClose={() => setShowProductManagement(false)}
             compressionSettings={compressionSettings}
