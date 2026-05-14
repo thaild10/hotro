@@ -1,0 +1,519 @@
+import React, { useState } from "react";
+import { 
+  User as UserIcon, 
+  Pencil, 
+  Stethoscope, 
+  Search as SearchIcon, 
+  PlayCircle,
+  CheckCircle,
+  History,
+  Clock,
+  Notebook,
+  X,
+  RotateCcw,
+  Plus,
+  Minus,
+  Image as ImageIcon
+} from "lucide-react";
+import { cn, getTodayFormatted, getTimeFormatted } from "../lib/utils";
+import { KanbanCard, TAB_NAMES, Customer, Product, Brand } from "../types";
+import { motion, AnimatePresence } from "motion/react";
+
+// Helper for tag colors (similar to logic in HTML)
+const TAG_COLOR_PALETTE = [
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
+  { bg: 'bg-violet-50', text: 'text-violet-500', border: 'border-violet-200' },
+  { bg: 'bg-amber-50',  text: 'text-amber-500',  border: 'border-amber-200'  },
+  { bg: 'bg-teal-50',   text: 'text-teal-500',   border: 'border-teal-200'   },
+  { bg: 'bg-fuchsia-50',text: 'text-fuchsia-500',border: 'border-fuchsia-200'},
+  { bg: 'bg-sky-50',    text: 'text-sky-500',    border: 'border-sky-200'    },
+  { bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-200' },
+  { bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200'   },
+];
+
+function getTagColors(tagText: string) {
+  let hash = 0;
+  for (let i = 0; i < tagText.length; i++) {
+    hash = (hash * 31 + tagText.charCodeAt(i)) % TAG_COLOR_PALETTE.length;
+  }
+  return TAG_COLOR_PALETTE[hash];
+}
+
+interface CardProps {
+  key?: string | number;
+  card: KanbanCard;
+  customers?: Customer[];
+  products?: Product[];
+  brands?: Brand[];
+  index: number;
+  onEdit: () => void;
+  onMove: (tabId: number) => void;
+  onMoveBack?: () => void;
+  onTagEdit: () => void;
+  onHistory: () => void;
+  onNoteEdit: () => void;
+  onDoctorReply: (index?: number) => void;
+  onNotify: () => void;
+  onAddDo?: () => void;
+  updateCard: (id: string, updates: Partial<KanbanCard>) => void;
+  confirmAction: (message: string, action: () => void) => void;
+}
+
+export default function Card({ 
+  card, 
+  customers = [],
+  products = [],
+  brands = [],
+  index, 
+  onEdit, 
+  onMove, 
+  onMoveBack,
+  onTagEdit, 
+  onHistory, 
+  onNoteEdit, 
+  onDoctorReply, 
+  onNotify,
+  onAddDo,
+  updateCard,
+  confirmAction
+}: CardProps) {
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const isDone = card.tabId === 7;
+  const isCollapsed = card.collapsed;
+
+  const handleToggleCollapse = () => {
+    updateCard(card.id, { collapsed: !isCollapsed });
+  };
+
+  const handleNotify = () => {
+    confirmAction("Bạn có chắc muốn báo khách?", () => {
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      updateCard(card.id, { 
+        notified: true, 
+        notifiedTime: `Đã báo ${dd}.${mm}` 
+      });
+      onNotify();
+    });
+  };
+
+  const tags = card.tags || [];
+  const cardProducts = card.products || [];
+  const cardImages = card.images || [];
+  const customer = customers.find(c => (c.name || '').toLowerCase() === (card.name || '').toLowerCase());
+
+  return (
+    <div className={cn(
+      "bg-white rounded-[32px] p-5 shadow-sm border border-pastel-border relative transition-all",
+      isDone && isCollapsed && "pb-4"
+    )}>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <button 
+            onClick={handleToggleCollapse}
+            className={cn(
+              "w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 active:scale-95 transition-all shadow-sm",
+              isCollapsed 
+                ? "text-rose-500 bg-rose-50 border-rose-100" 
+                : "text-slate-400 bg-slate-50 border-slate-100"
+            )}
+          >
+            {isCollapsed ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+          </button>
+
+          <span className="w-6 h-6 rounded-full bg-slate-800 text-white text-[10px] font-black flex items-center justify-center shrink-0">
+            {index + 1}
+          </span>
+          <div 
+            onClick={() => customer?.imageUrl && setSelectedImageUrl(customer.imageUrl)}
+            className={cn(
+              "w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center shrink-0 text-rose-400 overflow-hidden",
+              customer?.imageUrl && "cursor-pointer"
+            )}
+          >
+            {customer?.imageUrl ? (
+              <img src={customer.imageUrl} alt={card.name} className="w-full h-full object-cover" />
+            ) : (
+              <UserIcon className="w-5 h-5 fill-current" />
+            )}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span 
+              onClick={onEdit}
+              className="font-bold text-base tracking-wide truncate cursor-pointer hover:text-rose-500 transition-colors"
+            >
+              {card.name}
+            </span>
+            <span className="text-[10px] font-bold text-pastel-subtext italic truncate">(ấn vào tên để sửa thẻ)</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 shrink-0">
+          {!isCollapsed && (
+            <div className="flex items-center gap-2">
+              {card.doctorReplies && card.doctorReplies.length > 0 && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!card.replyAgain) updateCard(card.id, { replyAgain: true });
+                  }}
+                  className={cn(
+                    "text-[10px] font-black px-3 py-2 rounded-xl border transition-all h-9",
+                    card.replyAgain 
+                      ? "bg-slate-100 text-slate-400 border-slate-200 pointer-events-none" 
+                      : "text-sky-500 bg-sky-50 border-sky-100 active:scale-95"
+                  )}
+                >
+                  Trả lời tiếp
+                </button>
+              )}
+              <button 
+                onClick={onDoctorReply} 
+                className={cn(
+                  "text-[10px] font-black px-3 py-2 rounded-xl flex items-center gap-1 border active:scale-95 transition-all h-9",
+                  (card.doctorReplies && card.doctorReplies.length > 0 && !card.replyAgain) 
+                    ? "bg-violet-50 text-violet-300 border-violet-50 pointer-events-none opacity-50" 
+                    : "bg-violet-50 text-violet-500 border-violet-100"
+                )}
+              >
+                <Stethoscope className="w-3.5 h-3.5 fill-current" /> Bác sĩ trả lời
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Summary (when collapsed) */}
+      {isCollapsed && (
+        <div className="flex items-center gap-2 text-xs font-black flex-wrap mt-1">
+          <span className="flex items-center gap-1 text-pastel-subtext">
+            <PlayCircle className="w-3.5 h-3.5" /> Bắt đầu <b>{card.startDate}</b>
+          </span>
+          {card.doDate && (
+            <>
+              <span className="text-pastel-subtext">·</span>
+              <span className="flex items-center gap-1 text-rose-400">
+                <SearchIcon className="w-3.5 h-3.5" /> Ngày dò <b>{card.doDate}</b>
+              </span>
+            </>
+          )}
+          {card.doneDate && card.tabId === 7 && (
+            <>
+              <span className="text-pastel-subtext">·</span>
+              <span className="flex items-center gap-0.5 text-teal-500">
+                <CheckCircle className="w-3 h-3" /> Xong <b>{card.doneDate.split('.').slice(0, 2).join('.')}</b>
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Body Content */}
+      <div className={cn("space-y-4", isCollapsed && "hidden")}>
+        <div className="px-1 relative">
+          <p className="line-clamp-2 customer-text-content font-medium text-sm whitespace-pre-line text-pastel-text/90">
+            {card.note}
+          </p>
+          <button 
+            onClick={onNoteEdit} 
+            className="text-xs font-bold text-rose-500 mt-2 flex items-center gap-1.5 active:opacity-70 py-2"
+          >
+            <Notebook className="w-4 h-4" /> Sửa nội dung
+          </button>
+        </div>
+
+        {(() => {
+          const replies = card.doctorReplies || [];
+          if (replies.length === 0) return null;
+          
+          return (
+            <div className="space-y-2 mt-2">
+              {replies.map((reply, idx) => {
+                const isLatest = idx === replies.length - 1;
+                const formattedDate = reply.date ? reply.date.split('.').slice(0, 2).join('.') : '';
+                return (
+                  <div key={idx} className={cn(
+                    "border-l-4 p-4 rounded-r-2xl relative",
+                    isLatest ? "bg-violet-50/50 border-violet-300 shadow-sm" : "bg-slate-50 border-slate-200 opacity-60"
+                  )}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={cn("text-xs font-black", isLatest ? "text-violet-500" : "text-slate-400")}>Bác sĩ trả lời {formattedDate}</span>
+                    </div>
+                    <p className={cn(
+                      "text-sm mb-3 whitespace-pre-line",
+                      isLatest ? "text-pastel-text font-black" : "text-slate-400 font-medium"
+                    )}>
+                      {reply.text}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => onDoctorReply(idx)} 
+                        className="px-3 py-2 rounded-xl bg-white border border-violet-200 text-violet-500 font-bold text-xs active:scale-95 min-h-[36px]"
+                      >
+                        Sửa
+                      </button>
+                      <button 
+                        onClick={() => {
+                          confirmAction("Xóa phản hồi này?", () => {
+                            const newReplies = replies.filter((_, i) => i !== idx);
+                            updateCard(card.id, { 
+                              doctorReplies: newReplies,
+                              doctorText: newReplies.length > 0 ? newReplies[newReplies.length - 1].text : ""
+                            });
+                          });
+                        }} 
+                        className="px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-500 font-bold text-xs active:scale-95 min-h-[36px]"
+                      >
+                        Xóa
+                      </button>
+                      {isLatest && (
+                        card.notified ? (
+                          <span className="bg-teal-50 text-teal-600 border border-teal-200 px-3 py-2 rounded-xl font-bold text-xs min-h-[36px] flex items-center">
+                            {card.notifiedTime}
+                          </span>
+                        ) : (
+                          <button 
+                            onClick={handleNotify}
+                            className="px-3 py-2 rounded-xl bg-rose-400 text-white font-black text-xs active:scale-95 min-h-[36px]"
+                          >
+                            Báo khách
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {cardImages.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {cardImages.map((url, idx) => (
+              <div 
+                key={`${url}-${idx}`} 
+                onClick={() => setSelectedImageUrl(url)}
+                className="w-16 h-16 rounded-xl border border-pastel-border overflow-hidden cursor-pointer hover:ring-2 hover:ring-rose-200 transition-all shadow-sm shrink-0"
+              >
+                <img src={url} alt={`card-img-${idx}`} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {cardProducts.length > 0 && (
+          <div className="mt-4 bg-slate-50 border border-pastel-border p-3 rounded-2xl flex flex-col gap-3">
+            {/* Dò group */}
+            {cardProducts.filter(p => p.tag === 'Dò').length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider ml-1">Đang Dò:</span>
+                <div className="flex flex-col gap-1">
+                  {cardProducts
+                    .filter(p => p.tag === 'Dò')
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    .map((p, idx) => {
+                      const product = products.find(prod => prod.id === p.productId);
+                      const prodName = product?.name || 'Unknown';
+                      const brandName = product?.brandId ? brands.find(b => b.id === product.brandId)?.name : '';
+                      const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
+                      const dateLabel = p.date ? ` - ${p.date}` : '';
+                      return (
+                        <div key={`do-${p.productId}-${idx}`} className="px-3 py-2 bg-white border border-pastel-border/50 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2">
+                          <span className="w-5 h-5 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg text-[10px]">{idx + 1}</span>
+                          <span className="flex-1 truncate">{displayName}{dateLabel}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+            {/* Dò xong group */}
+            {cardProducts.filter(p => p.tag === 'Dò xong').length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-wider ml-1">Dò xong:</span>
+                <div className="flex flex-col gap-1">
+                  {cardProducts
+                    .filter(p => p.tag === 'Dò xong')
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    .map((p, idx) => {
+                      const product = products.find(prod => prod.id === p.productId);
+                      const prodName = product?.name || 'Unknown';
+                      const brandName = product?.brandId ? brands.find(b => b.id === product.brandId)?.name : '';
+                      const displayName = brandName ? `${brandName} - ${prodName}` : prodName;
+                      const dateLabel = p.date ? ` - ${p.date}` : '';
+                      return (
+                        <div key={`done-${p.productId}-${idx}`} className="px-3 py-2 bg-white border border-pastel-border/50 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2">
+                          <span className="w-5 h-5 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg text-[10px]">{idx + 1}</span>
+                          <span className="flex-1 truncate">{displayName}{dateLabel}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      {!isCollapsed && (
+        <div className="mt-5 pt-4 border-t border-pastel-border/60 overflow-x-auto no-scrollbar pb-2">
+          <div className="flex items-center justify-between gap-4 min-w-max">
+            <div className="flex items-center gap-4 whitespace-nowrap shrink-0">
+              <div className="flex items-center gap-3 text-xs font-black">
+                <div className="flex items-center gap-1.5 text-pastel-subtext">
+                  <PlayCircle className="w-4 h-4" />
+                  <span className="ml-0.5">Bắt đầu</span> <span>{card.startDate}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-rose-500">
+                  <SearchIcon className="w-4 h-4" />
+                  <span className="ml-0.5">Ngày dò</span> <span>{card.doDate}</span>
+                </div>
+                {card.tabId === 7 && card.doneDate && (
+                  <div className="flex items-center gap-1.5 text-teal-600">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="ml-0.5">Xong</span> <span>{card.doneDate.split('.').slice(0, 2).join('.')}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 items-center">
+                {tags.map((tag, idx) => {
+                  const colors = getTagColors(tag);
+                  return (
+                    <span 
+                      key={`${tag}-${idx}`} 
+                      className={cn(
+                        "px-2.5 py-1 rounded-full text-[10px] font-black border",
+                        colors.bg, colors.text, colors.border
+                      )}
+                    >
+                      {tag}
+                    </span>
+                  );
+                })}
+              </div>
+
+              <button 
+                onClick={onTagEdit}
+                className="w-10 h-10 rounded-full bg-pastel-bg text-pastel-subtext flex items-center justify-center border border-pastel-border shrink-0 active:scale-90 transition-all"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {tags.includes("Xếp lịch") && (
+                <button 
+                  onClick={() => {
+                    const newTags = tags.filter(t => t !== "Xếp lịch");
+                    const newNote = card.note.replace(/🔔 Hẹn: .*\n?/, '').trim();
+                    updateCard(card.id, { tags: newTags, note: newNote });
+                  }}
+                  className="px-4 py-2 rounded-xl bg-amber-500 text-white font-bold text-xs active:scale-95 transition-all shadow-sm h-9"
+                >
+                  Đã qua
+                </button>
+              )}
+              {card.tabId === 1 && (
+                <>
+                  <button 
+                    onClick={() => onMove(2)}
+                    className="px-4 py-2 rounded-xl bg-sky-50 text-sky-600 font-bold text-xs border border-sky-100 active:scale-95 transition-all h-9 flex items-center justify-center min-w-[100px]"
+                  >
+                    Đã thanh toán
+                  </button>
+                  <button 
+                    onClick={() => onMove(6)}
+                    className="px-4 py-2 rounded-xl bg-orange-50 text-orange-600 font-bold text-xs border border-orange-100 active:scale-95 transition-all h-9 flex items-center justify-center min-w-[100px]"
+                  >
+                    Không lấy
+                  </button>
+                </>
+              )}
+              {card.tabId === 2 && (
+                <>
+                  <button 
+                    onClick={() => onMove(3)}
+                    className="px-4 py-2 rounded-xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 transition-all h-9 flex items-center justify-center min-w-[100px]"
+                  >
+                    Đã nhận
+                  </button>
+                </>
+              )}
+              {card.tabId !== 1 && card.tabId !== 2 && card.tabId !== 7 && (
+                <button 
+                  onClick={() => onMove(7)}
+                  className="px-4 py-2 rounded-xl bg-teal-50 text-teal-600 font-bold text-xs border border-teal-100 active:scale-95 transition-all h-9 flex items-center justify-center min-w-[100px]"
+                >
+                  {card.tabId === 5 ? "Đã kiểm tra" : "Xong"}
+                </button>
+              )}
+              {isDone && (
+                <button 
+                  onClick={onMoveBack}
+                  className="px-4 py-2 rounded-xl bg-slate-50 text-slate-500 font-bold text-[10px] border border-slate-200 active:scale-95 transition-all h-9 flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  {(() => {
+                    const moveLogs = (card.logs || []).filter(l => l.includes("Chuyển sang"));
+                    const prevMoveLog = moveLogs[1];
+                    let targetName = "bước trước";
+                    if (prevMoveLog) {
+                      for (const [id, name] of Object.entries(TAB_NAMES)) {
+                        if (prevMoveLog.includes(`Chuyển sang ${name}`) || prevMoveLog.includes(`Chuyển sang ${id}.`)) {
+                          targetName = name;
+                          break;
+                        }
+                      }
+                    }
+                    return `Quay lại ${targetName}`;
+                  })()}
+                </button>
+              )}
+              <button 
+                onClick={onHistory}
+                className="px-4 py-2 rounded-xl bg-slate-50 text-slate-400 font-bold text-xs border border-slate-100 active:scale-95 transition-all h-9 flex items-center gap-1.5"
+              >
+                <History className="w-4 h-4" /> Lịch sử
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Dò Button for Tab 3 */}
+      {card.tabId === 3 && !isCollapsed && (
+        <div className="mt-4 flex justify-center border-t border-pastel-border/60 pt-4">
+          <button 
+            onClick={onAddDo}
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 font-bold text-xs active:scale-95 transition-all shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Sửa Add/Dò
+          </button>
+        </div>
+      )}
+
+      {/* Image View Overlay */}
+      <AnimatePresence>
+        {selectedImageUrl && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center p-8"
+            onClick={() => setSelectedImageUrl(null)}
+          >
+            <button className="absolute top-6 right-6 p-3 bg-white/10 rounded-full text-white">
+              <X className="w-8 h-8" />
+            </button>
+            <img src={selectedImageUrl} alt="full" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
